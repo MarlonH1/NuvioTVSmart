@@ -34,7 +34,8 @@ var COMMANDS = {
   next: true,
   audio: true,
   subtitle: true,
-  subtitleDelay: true
+  subtitleDelay: true,
+  skip: true
 };
 
 function randomCode() {
@@ -53,6 +54,7 @@ function idlePlayback(now) {
     subtitleTracks: [],
     subtitleDelayMs: 0,
     hasNext: false,
+    skip: null,
     error: null
   };
 }
@@ -300,14 +302,40 @@ function createHub(deps) {
     return null;
   }
 
+  // One volume call at a time. While a slider is dragged, "set" requests pile up; only the
+  // newest one matters, so a waiting "set" is replaced instead of queued.
+  var volumeBusy = false;
+  var volumeQueue = [];
+
   function changeVolume(phone, request) {
     var action = String(request.action || "get");
-    tv.volume(action).then(function (result) {
+    if (action === "set") {
+      volumeQueue = volumeQueue.filter(function (item) {
+        return item.action !== "set";
+      });
+    }
+    volumeQueue.push({ phone: phone, request: request, action: action });
+    runVolumeQueue();
+  }
+
+  function runVolumeQueue() {
+    if (volumeBusy || !volumeQueue.length) return;
+    var item = volumeQueue.shift();
+    volumeBusy = true;
+    tv.volume(item.action, item.request.level).then(function (result) {
+      volumeBusy = false;
       if (result.level != null) volume.level = result.level;
       if (result.muted != null) volume.muted = result.muted;
-      if (!result.ok)
-        reply(phone, request, { type: "error", code: "volume_failed", message: result.error });
-      sendVolume(null);
+      if (!result.ok) {
+        reply(item.phone, item.request, {
+          type: "error",
+          code: "volume_failed",
+          message: result.error
+        });
+      }
+      // Intermediate levels of a drag are not worth broadcasting.
+      if (!volumeQueue.length) sendVolume(null);
+      runVolumeQueue();
     });
   }
 

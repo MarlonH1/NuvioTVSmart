@@ -93,8 +93,18 @@ function createTv(options) {
   var appId = options.appId;
   var alertId = null;
 
-  function volume(action) {
-    var change = VOLUME_CALLS[action] ? firstOk(call, VOLUME_CALLS[action]) : Promise.resolve(null);
+  function volume(action, level) {
+    var calls = VOLUME_CALLS[action];
+    if (action === "set") {
+      var target = Math.max(0, Math.min(100, Math.round(Number(level))));
+      calls = isFinite(target)
+        ? [
+            ["luna://com.webos.service.audio/master/setVolume", { volume: target }],
+            ["luna://com.webos.audio/setVolume", { volume: target }]
+          ]
+        : null;
+    }
+    var change = calls ? firstOk(call, calls) : Promise.resolve(null);
     return change.then(function (changed) {
       return firstOk(call, VOLUME_GET).then(function (read) {
         var state = readVolume(read.result);

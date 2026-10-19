@@ -63,8 +63,15 @@ function fakeTv() {
     level: 20,
     muted: false,
     info: () => Promise.resolve({ name: "Wohnzimmer", model: "OLED42C3" }),
-    volume(action) {
-      calls.push("volume:" + action);
+    volume(action, level) {
+      calls.push("volume:" + action + (action === "set" ? ":" + level : ""));
+      if (action === "set") {
+        // A slow TV: the slider sends faster than luna answers.
+        this.level = level;
+        return new Promise((resolve) =>
+          setTimeout(() => resolve({ ok: true, level: this.level, muted: this.muted }), 50)
+        );
+      }
       if (action === "up") this.level += 1;
       if (action === "down") this.level -= 1;
       if (action === "mute") this.muted = true;
@@ -384,4 +391,45 @@ test("watch stream reports only playback start/stop and rejects unknown tokens",
   } finally {
     env.teardown();
   }
+});
+
+test("slider drags only apply the newest absolute volume", async () => {
+  const env = await setup();
+  try {
+    const { phone } = await pairPhone(env);
+    for (const level of [30, 35, 40, 45, 50]) phone.send({ type: "volume", action: "set", level });
+    const state = await phone.next("volume.state", (m) => m.level === 50);
+    assert.strictEqual(state.level, 50);
+    await new Promise((r) => setTimeout(r, 150));
+    const sets = env.tv.calls.filter((c) => c.startsWith("volume:set"));
+    // The first one runs immediately, the rest collapse into the newest.
+    assert.deepStrictEqual(sets, ["volume:set:30", "volume:set:50"]);
+    // No intermediate level was broadcast.
+    assert.strictEqual(
+      phone.inbox.filter((m) => m.type === "volume.state" && m.level !== 50).length,
+      0
+    );
+  } finally {
+    env.teardown();
+  }
+});
+
+test("tv adapter sets absolute volume via luna", async () => {
+  const seen = [];
+  const tv = createTv({
+    appId: "space.nuvio.webos",
+    call: (uri, params) => {
+      seen.push([uri, params]);
+      if (uri.endsWith("master/setVolume")) return Promise.resolve({ returnValue: true });
+      if (uri.endsWith("com.webos.audio/getVolume"))
+        return Promise.resolve({ returnValue: true, volume: 42, muteStatus: false });
+      return Promise.resolve({ returnValue: false });
+    }
+  });
+  const result = await tv.volume("set", 42.4);
+  assert.strictEqual(result.level, 42);
+  assert.deepStrictEqual(seen[0], [
+    "luna://com.webos.service.audio/master/setVolume",
+    { volume: 42 }
+  ]);
 });
