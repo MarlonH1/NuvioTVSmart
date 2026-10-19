@@ -5,8 +5,12 @@
 // launching the app. Playback commands are forwarded to the app; its state is fanned out to
 // every paired phone.
 //
+// webOS freezes Nuvio instead of closing it when the TV is switched off or another app/input
+// comes to the front. The socket stays open (the browser still answers pings), so the hub
+// watches power state and the foreground app itself and stops reporting "playing" then.
+//
 // Bridge protocol (hub <-> Nuvio app), same flat JSON envelope:
-//   app -> hub: app.hello {version}, state {playback}
+//   app -> hub: app.hello {version, appId?}, state {playback}
 //   hub -> app: play {request}, cmd {action, ...}, pair.show {code, clientName}, pair.hide,
 //               state.get
 "use strict";
@@ -18,6 +22,10 @@ var PENDING_PLAY_TIMEOUT_MS = 45000;
 // The phone interpolates the position itself; the app sends extra updates on drift, so a slow
 // heartbeat is enough and saves phone battery during long playback.
 var STATE_HEARTBEAT_MS = 30000;
+// The app re-sends its state at least every 30 s while playing. Silence well beyond that means
+// webOS froze it without the hub noticing (no power or foreground event).
+var STALE_APP_MS = 75000;
+var STALE_CHECK_MS = 5000;
 // /watch: one idle HTTP stream per phone watcher (remote/magisk). Lines only on start/stop of
 // playback plus a keepalive, so the phone sleeps in between.
 var WATCH_KEEPALIVE_MS = 600000;
@@ -64,10 +72,13 @@ function isLoopback(address) {
 }
 
 /**
- * @param deps.tv      TV adapter (lib/tv.js): info(), volume(action), launchApp(), showCode(), hideCode()
+ * @param deps.tv      TV adapter (lib/tv.js): info(), volume(action), launchApp(), showCode(),
+ *                     hideCode(), optional watchPresence(onChange)
  * @param deps.store   persistent store (lib/store.js)
+ * @param deps.appId   webOS id of Nuvio; the id the app reports in app.hello takes precedence
  * @param deps.log     function(line)
  * @param deps.now     optional clock, for tests
+ * @param deps.staleAppMs, deps.staleCheckMs  optional watchdog timings, for tests
  */
 function createHub(deps) {
   var tv = deps.tv;
@@ -83,6 +94,11 @@ function createHub(deps) {
   var pendingPlay = null;
   var pendingTimer = null;
   var tvInfo = { id: store.tvId(), name: "LG TV", model: null, platform: "webos" };
+  var configuredAppId = deps.appId || null;
+  var reportedAppId = null;
+  var presence = { poweredOn: null, foregroundAppId: null };
+  var lastAppStateAt = 0;
+  var staleAppMs = deps.staleAppMs || STALE_APP_MS;
 
   tv.info().then(function (info) {
     if (info.name) tvInfo.name = info.name;
@@ -133,6 +149,56 @@ function createHub(deps) {
     watchers.forEach(function (watcher) {
       watcher.write(line);
     });
+  }
+
+  function nuvioAppId() {
+    return reportedAppId || configuredAppId;
+  }
+
+  // Unknown values count as visible, so a TV without the luna subscriptions behaves as before.
+  function appVisible() {
+    if (presence.poweredOn === false) return false;
+    var id = nuvioAppId();
+    return !(presence.foregroundAppId && id && presence.foregroundAppId !== id);
+  }
+
+  // The position the player had reached at `at`, as a paused state.
+  function frozen(state, at) {
+    var next = Object.assign({}, state);
+    if (state.status === "playing") {
+      var elapsed = Math.max(0, at - (Number(state.at) || at)) * (Number(state.rate) || 1);
+      next.positionMs = Math.round((Number(state.positionMs) || 0) + elapsed);
+      if (state.durationMs > 0) next.positionMs = Math.min(next.positionMs, state.durationMs);
+    }
+    next.status = "paused";
+    next.at = at;
+    return next;
+  }
+
+  // What the phones should see for a state while Nuvio is not on screen.
+  function hiddenPlayback(state, at) {
+    if (presence.poweredOn === false) return isActive(state) ? idlePlayback(at) : state;
+    return state.status === "playing" || state.status === "buffering" ? frozen(state, at) : state;
+  }
+
+  function setPresence(next) {
+    var wasVisible = appVisible();
+    presence = { poweredOn: next.poweredOn, foregroundAppId: next.foregroundAppId };
+    var visible = appVisible();
+    if (wasVisible === visible) return;
+    if (visible) {
+      log("tv: nuvio in front");
+      // The app does not resend an unchanged state, so ask for it explicitly.
+      if (app) send(app, { type: "state.get" });
+      return;
+    }
+    log(
+      presence.poweredOn === false
+        ? "tv: powered off"
+        : "tv: nuvio in background (" + presence.foregroundAppId + ")"
+    );
+    var next = hiddenPlayback(playback, now());
+    if (next !== playback) setPlayback(next);
   }
 
   function setPlayback(next) {
@@ -291,6 +357,13 @@ function createHub(deps) {
       return { type: "error", code: "unknown_action", message: String(request.action) };
     if (!app)
       return { type: "error", code: "no_player", message: "Nuvio is not running on the TV" };
+    // A frozen app only handles the command once it is back in front.
+    var resumes = request.action === "play" || request.action === "toggle";
+    if (resumes && !appVisible() && presence.poweredOn !== false) {
+      tv.launchApp().then(function (result) {
+        if (!result.ok) log("launch failed: " + result.error);
+      });
+    }
     send(app, {
       type: "cmd",
       action: request.action,
@@ -432,6 +505,7 @@ function createHub(deps) {
       }
       if (!message) return;
       if (message.type === "app.hello") {
+        if (message.appId) reportedAppId = String(message.appId);
         if (pendingPlay) {
           send(connection, { type: "play", request: pendingPlay });
           clearPending();
@@ -439,7 +513,9 @@ function createHub(deps) {
         var pairing = activePairing();
         if (pairing) showCode(pairing);
       } else if (message.type === "state" && message.playback) {
-        setPlayback(Object.assign(idlePlayback(now()), message.playback));
+        lastAppStateAt = now();
+        var next = Object.assign(idlePlayback(now()), message.playback);
+        setPlayback(appVisible() ? next : hiddenPlayback(next, now()));
       }
     });
     connection.on("close", function () {
@@ -462,6 +538,18 @@ function createHub(deps) {
   }, STATE_HEARTBEAT_MS);
   if (typeof heartbeat.unref === "function") heartbeat.unref();
 
+  var staleCheck = setInterval(function () {
+    if (!app || (playback.status !== "playing" && playback.status !== "buffering")) return;
+    if (now() - lastAppStateAt < staleAppMs) return;
+    log("nuvio app stopped reporting, marking playback paused");
+    setPlayback(frozen(playback, Number(playback.at) || now()));
+    send(app, { type: "state.get" });
+  }, deps.staleCheckMs || STALE_CHECK_MS);
+  if (typeof staleCheck.unref === "function") staleCheck.unref();
+
+  var stopPresence =
+    typeof tv.watchPresence === "function" ? tv.watchPresence(setPresence) : function () {};
+
   return {
     handleConnection: handleConnection,
     handleWatch: handleWatch,
@@ -469,6 +557,9 @@ function createHub(deps) {
       return {
         tv: tvInfo,
         appConnected: !!app,
+        appId: nuvioAppId(),
+        tvPoweredOn: presence.poweredOn,
+        foregroundAppId: presence.foregroundAppId,
         phones: phones.map(function (phone) {
           return {
             address: phone.connection.remoteAddress,
@@ -483,6 +574,8 @@ function createHub(deps) {
     },
     stop: function () {
       clearInterval(heartbeat);
+      clearInterval(staleCheck);
+      stopPresence();
       watchers.slice().forEach(function (watcher) {
         watcher.end();
       });

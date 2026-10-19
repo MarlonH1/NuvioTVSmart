@@ -11,7 +11,7 @@ const path = require("node:path");
 const { attachWebSocketServer } = require("../lib/ws");
 const { createHub } = require("../lib/hub");
 const { createStore } = require("../lib/store");
-const { createTv, readVolume } = require("../lib/tv");
+const { createTv, createLunaSubscriber, isPoweredOn, readVolume } = require("../lib/tv");
 const net = require("node:net");
 
 // Same request the Magisk watcher sends: HTTP/1.0 over a raw socket, read line by line.
@@ -90,6 +90,10 @@ function fakeTv() {
     hideCode() {
       calls.push("hideCode");
       return Promise.resolve();
+    },
+    watchPresence(onChange) {
+      this.presence = onChange;
+      return () => {};
     }
   };
 }
@@ -133,11 +137,11 @@ class Client {
   }
 }
 
-async function setup() {
+async function setup(hubOptions) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nuvio-remote-"));
   const tv = fakeTv();
   const store = createStore(path.join(dir, "state.json"));
-  const hub = createHub({ tv, store });
+  const hub = createHub(Object.assign({ tv, store, appId: "com.marlon.nuvio" }, hubOptions));
   const server = http.createServer((req, res) => {
     if (req.url.startsWith("/watch")) hub.handleWatch(req, res);
     else res.end();
@@ -432,4 +436,127 @@ test("tv adapter sets absolute volume via luna", async () => {
     "luna://com.webos.service.audio/master/setVolume",
     { volume: 42 }
   ]);
+});
+
+function playingState(positionMs) {
+  return {
+    status: "playing",
+    positionMs,
+    durationMs: 3600000,
+    at: Date.now(),
+    rate: 1,
+    media: { type: "series", title: "The Bear" }
+  };
+}
+
+test("switching the TV off or to another input stops reporting playing", async () => {
+  const env = await setup();
+  try {
+    const { phone } = await pairPhone(env);
+    const app = await env.connect("/app");
+    // The app reports its own id; the configured one is only the fallback.
+    app.send({ type: "app.hello", version: "test", appId: "space.nuvio.webos" });
+    env.tv.presence({ poweredOn: true, foregroundAppId: "space.nuvio.webos" });
+    app.send({ type: "state", playback: playingState(100000) });
+    await phone.next("state", (m) => m.playback.status === "playing");
+
+    // HDMI 1 comes to the front: the player is frozen at its last position.
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.webos.app.hdmi1" });
+    const paused = await phone.next("state", (m) => m.playback.status === "paused");
+    assert.strictEqual(paused.playback.media.title, "The Bear");
+    assert.ok(paused.playback.positionMs >= 100000 && paused.playback.positionMs < 105000);
+
+    // A late "playing" from the frozen app must not bring the old status back.
+    app.send({ type: "state", playback: playingState(101000) });
+    const late = await phone.next("state");
+    assert.strictEqual(late.playback.status, "paused");
+
+    // "play" from the phone brings Nuvio back to the front.
+    phone.send({ type: "cmd", action: "toggle" });
+    assert.strictEqual((await app.next("cmd")).action, "toggle");
+    await waitFor(() => env.tv.calls.includes("launch"));
+
+    // Back in front: the hub asks the app for a fresh state.
+    env.tv.presence({ poweredOn: true, foregroundAppId: "space.nuvio.webos" });
+    await app.next("state.get");
+    app.send({ type: "state", playback: playingState(102000) });
+    await phone.next("state", (m) => m.playback.status === "playing");
+
+    // TV off: nothing is playing any more.
+    env.tv.presence({ poweredOn: false, foregroundAppId: "space.nuvio.webos" });
+    const idle = await phone.next("state", (m) => m.playback.status === "idle");
+    assert.strictEqual(idle.playback.media, null);
+    app.send({ type: "state", playback: playingState(103000) });
+    assert.strictEqual((await phone.next("state")).playback.status, "idle");
+    assert.deepStrictEqual(env.hub.status().tvPoweredOn, false);
+  } finally {
+    env.teardown();
+  }
+});
+
+test("an app that stops reporting while playing is marked paused", async () => {
+  const env = await setup({ staleAppMs: 150, staleCheckMs: 50 });
+  try {
+    const { phone } = await pairPhone(env);
+    const app = await env.connect("/app");
+    app.send({ type: "app.hello", version: "test" });
+    app.send({ type: "state", playback: playingState(5000) });
+    await phone.next("state", (m) => m.playback.status === "playing");
+    const paused = await phone.next("state", (m) => m.playback.status === "paused");
+    assert.strictEqual(paused.playback.positionMs, 5000);
+    await app.next("state.get");
+  } finally {
+    env.teardown();
+  }
+});
+
+test("tv adapter turns luna subscriptions into power and foreground changes", async () => {
+  const handlers = {};
+  const tv = createTv({
+    appId: "com.marlon.nuvio",
+    call: () => Promise.resolve({ returnValue: true }),
+    subscribe: (uri, onReply) => {
+      handlers[uri] = onReply;
+      return () => {};
+    }
+  });
+  const changes = [];
+  tv.watchPresence((presence) => changes.push(presence));
+  const power = handlers["luna://com.webos.service.tvpower/power/getPowerState"];
+  const foreground = handlers["luna://com.webos.applicationManager/getForegroundAppInfo"];
+  power({ returnValue: true, subscribed: true, state: "Active" });
+  foreground({ returnValue: true, appId: "com.marlon.nuvio" });
+  foreground({ returnValue: true, appId: "" });
+  foreground({ returnValue: true, appId: "com.marlon.nuvio" });
+  power({ returnValue: true, state: "Active", processing: "Request Power Off" });
+  power({ returnValue: true, state: "Active Standby" });
+  assert.deepStrictEqual(changes, [
+    { poweredOn: true, foregroundAppId: null },
+    { poweredOn: true, foregroundAppId: "com.marlon.nuvio" },
+    { poweredOn: false, foregroundAppId: "com.marlon.nuvio" }
+  ]);
+  assert.strictEqual(isPoweredOn({ state: "Screen Off" }), true);
+  assert.strictEqual(isPoweredOn({ state: "Suspend" }), false);
+});
+
+test("luna subscriber parses line-delimited replies and restarts nothing after stop", async () => {
+  const { EventEmitter } = require("node:events");
+  const spawned = [];
+  const subscribe = createLunaSubscriber({
+    spawn: (binary, args) => {
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.kill = () => child.emit("exit", 0);
+      spawned.push({ binary, args, child });
+      return child;
+    }
+  });
+  const replies = [];
+  const stop = subscribe("luna://x/y", (reply) => replies.push(reply));
+  assert.deepStrictEqual(spawned[0].args, ["-i", "luna://x/y", '{"subscribe":true}']);
+  spawned[0].child.stdout.emit("data", '{"a":1}\n{"b"');
+  spawned[0].child.stdout.emit("data", ":2}\nnoise\n");
+  assert.deepStrictEqual(replies, [{ a: 1 }, { b: 2 }]);
+  stop();
+  assert.strictEqual(spawned.length, 1);
 });

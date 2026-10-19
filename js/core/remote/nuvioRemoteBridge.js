@@ -43,6 +43,7 @@ let lastSentPlayback = null;
 let pendingPlayToken = 0;
 let foregroundGuardUntil = 0;
 let lastError = null;
+let lifecycleBound = false;
 
 export function isNuvioRemoteEnabled() {
   return LocalStore.get(NUVIO_REMOTE_ENABLED_KEY, false) === true;
@@ -69,6 +70,7 @@ export function isNuvioRemoteForegroundRequest() {
 export function startNuvioRemoteBridge() {
   if (started || !isNuvioRemoteEnabled() || typeof WebSocket !== "function") return;
   started = true;
+  bindLifecycle();
   connect();
   pollTimer = setInterval(pushStateIfChanged, STATE_POLL_MS);
 }
@@ -102,7 +104,11 @@ function connect() {
   ws.onopen = () => {
     reconnectDelay = RECONNECT_MIN_MS;
     lastStateJson = "";
-    send({ type: "app.hello", version: globalThis.__NUVIO_APP_VERSION__ || null });
+    send({
+      type: "app.hello",
+      version: globalThis.__NUVIO_APP_VERSION__ || null,
+      appId: readAppId()
+    });
     pushStateIfChanged(true);
   };
   ws.onmessage = (event) => {
@@ -120,6 +126,37 @@ function connect() {
     scheduleReconnect();
   };
   ws.onerror = () => {};
+}
+
+// The daemon compares this with the foreground app to see whether Nuvio is on screen.
+function readAppId() {
+  const identifier = String(
+    globalThis.webOSSystem?.identifier || globalThis.PalmSystem?.identifier || ""
+  );
+  return identifier.split(" ")[0] || null;
+}
+
+// webOS freezes the app when the TV is switched off or another app/input comes to the front.
+// Pause first and report it while the socket still works, so the phone does not keep showing
+// "playing" for a player nobody watches.
+function onHidden() {
+  const player = currentPlayer();
+  if (player && !player.paused) safe(() => player.applyMediaAction("pause"));
+  pushStateIfChanged(true);
+}
+
+function onVisible() {
+  pushStateIfChanged(true);
+}
+
+function bindLifecycle() {
+  if (lifecycleBound || typeof document === "undefined") return;
+  lifecycleBound = true;
+  const isHidden = () => document.visibilityState === "hidden" || document.webkitHidden === true;
+  const sync = () => (isHidden() ? onHidden() : onVisible());
+  document.addEventListener("visibilitychange", sync);
+  document.addEventListener("webkitvisibilitychange", sync);
+  globalThis.addEventListener?.("pagehide", onHidden);
 }
 
 function scheduleReconnect() {

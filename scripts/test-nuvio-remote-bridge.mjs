@@ -18,6 +18,16 @@ globalThis.localStorage = {
   setItem: (k, v) => storage.set(k, String(v)),
   removeItem: (k) => storage.delete(k)
 };
+// Just enough of a document for the bridge's visibility handling.
+const fakeDocument = new EventTarget();
+fakeDocument.visibilityState = "visible";
+fakeDocument.body = null;
+fakeDocument.getElementById = () => null;
+globalThis.document = fakeDocument;
+function setVisibility(state) {
+  fakeDocument.visibilityState = state;
+  fakeDocument.dispatchEvent(new Event("visibilitychange"));
+}
 
 // ---------------------------------------------------------------- daemon side
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nuvio-remote-bridge-"));
@@ -327,6 +337,14 @@ try {
   await waitFor(() => navigations.length === 2, "second navigation");
   assert.equal(navigations[1].options.replaceHistory, true);
   assert.equal(navigations[1].params.startFromBeginning, true);
+
+  // TV switched off / other input: the app pauses itself and reports it before webOS freezes it.
+  fakePlayer.paused = false;
+  await phone.next("state", (m) => m.playback.status === "playing");
+  setVisibility("hidden");
+  await phone.next("state", (m) => m.playback.status === "paused");
+  assert.deepEqual(playerCalls.at(-1), ["media", "pause"]);
+  setVisibility("visible");
 
   // Turning the feature off disconnects; the daemon then reports idle to the phone.
   bridge.setNuvioRemoteEnabled(false);

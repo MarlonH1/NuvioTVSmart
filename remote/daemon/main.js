@@ -16,7 +16,7 @@ var createHub = require("./lib/hub").createHub;
 var createStore = require("./lib/store").createStore;
 var createTv = require("./lib/tv").createTv;
 
-var VERSION = "0.1.0";
+var VERSION = "0.2.0";
 var BEACON_PORT = 47810;
 var BEACON_INTERVAL_MS = 3000;
 
@@ -52,9 +52,14 @@ var tv = createTv({
     ? null
     : function () {
         return Promise.resolve({ returnValue: false, errorText: "luna disabled" });
+      },
+  subscribe: options.luna
+    ? null
+    : function () {
+        return function () {};
       }
 });
-var hub = createHub({ tv: tv, store: store, log: log });
+var hub = createHub({ tv: tv, store: store, log: log, appId: options.appId });
 var startedAt = Date.now();
 var responder = null;
 
