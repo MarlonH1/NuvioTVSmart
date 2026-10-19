@@ -3264,4 +3264,14 @@
     <string name="party_invite_scan">Scan with a phone to join</string>
     <string name="party_invite_share">Or share the code. Friends can enter it in Watch party on any Nuvio app.</string>
     <string name="party_invite_qr">Watch party invite QR code</string>
+    <string name="nuvio_remote_title">Phone remote</string>
+    <string name="nuvio_remote_settings_description">Control Nuvio on this TV from your phone</string>
+    <string name="nuvio_remote_toggle_title">Allow phone remote</string>
+    <string name="nuvio_remote_toggle_subtitle">Needs the Nuvio Remote service (rooted TV)</string>
+    <string name="nuvio_remote_status_title">Service</string>
+    <string name="nuvio_remote_status_connected">Connected</string>
+    <string name="nuvio_remote_status_missing">Not found. Install the service on the TV.</string>
+    <string name="nuvio_remote_status_off">Off</string>
+    <string name="nuvio_remote_pair_title">Pair %1$s</string>
+    <string name="nuvio_remote_pair_hint">Enter this code on your phone.</string>
 </resources>

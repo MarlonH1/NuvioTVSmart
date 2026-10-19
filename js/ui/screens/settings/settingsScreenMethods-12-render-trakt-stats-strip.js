@@ -1,5 +1,6 @@
 import { renderAmbientSection } from "./settingsAmbientSection.js";
 import { renderWatchPartySection } from "./settingsWatchPartySection.js";
+import { renderNuvioRemoteSection } from "./settingsNuvioRemoteSection.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./settingsScreenContext.js";
 
@@ -185,6 +186,7 @@ export function createSettingsScreenMethods12() {
       if (section.id === "account") return this.renderAccountSection(model);
       if (section.id === "profiles") return this.renderProfilesSection(model);
       if (section.id === "watchParty") return renderWatchPartySection.call(this);
+      if (section.id === "nuvioRemote") return renderNuvioRemoteSection.call(this);
       if (section.id === "appearance") return this.renderAppearanceSection(model);
       if (section.id === "ambient") return renderAmbientSection.call(this);
       if (section.id === "layout") return this.renderLayoutSection(model);

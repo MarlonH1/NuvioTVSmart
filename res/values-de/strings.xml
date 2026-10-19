@@ -2545,4 +2545,14 @@
     <string name="party_invite_scan">Mit dem Smartphone scannen, um beizutreten</string>
     <string name="party_invite_share">Oder teile den Code. Freunde können ihn in jeder Nuvio-App unter Watch Party eingeben.</string>
     <string name="party_invite_qr">QR-Code der Watch-Party-Einladung</string>
+    <string name="nuvio_remote_title">Handy-Fernbedienung</string>
+    <string name="nuvio_remote_settings_description">Nuvio auf diesem Fernseher mit dem Handy steuern</string>
+    <string name="nuvio_remote_toggle_title">Handy als Fernbedienung erlauben</string>
+    <string name="nuvio_remote_toggle_subtitle">Benötigt den Nuvio-Remote-Dienst (gerooteter Fernseher)</string>
+    <string name="nuvio_remote_status_title">Dienst</string>
+    <string name="nuvio_remote_status_connected">Verbunden</string>
+    <string name="nuvio_remote_status_missing">Nicht gefunden. Installiere den Dienst auf dem Fernseher.</string>
+    <string name="nuvio_remote_status_off">Aus</string>
+    <string name="nuvio_remote_pair_title">%1$s koppeln</string>
+    <string name="nuvio_remote_pair_hint">Gib diesen Code auf deinem Handy ein.</string>
 </resources>

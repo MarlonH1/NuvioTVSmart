@@ -1,0 +1,403 @@
+// Nuvio Remote hub: speaks protocol v1 (NuvioMobile docs/remote-protocol.md) with phones on
+// /ws and a small bridge protocol with the Nuvio TV app on /app (loopback only).
+//
+// The hub owns everything that must work while Nuvio is closed: pairing, tokens, volume and
+// launching the app. Playback commands are forwarded to the app; its state is fanned out to
+// every paired phone.
+//
+// Bridge protocol (hub <-> Nuvio app), same flat JSON envelope:
+//   app -> hub: app.hello {version}, state {playback}
+//   hub -> app: play {request}, cmd {action, ...}, pair.show {code, clientName}, pair.hide,
+//               state.get
+"use strict";
+
+var crypto = require("crypto");
+
+var PROTOCOL_VERSION = 1;
+var PENDING_PLAY_TIMEOUT_MS = 45000;
+var STATE_HEARTBEAT_MS = 5000;
+var MAX_CODE_ATTEMPTS = 5;
+var UNPAIRED_TYPES = { hello: true, "pair.begin": true, "pair.confirm": true, ping: true };
+var COMMANDS = {
+  play: true,
+  pause: true,
+  toggle: true,
+  stop: true,
+  seek: true,
+  seekBy: true,
+  next: true,
+  audio: true,
+  subtitle: true,
+  subtitleDelay: true
+};
+
+function randomCode() {
+  return String(crypto.randomBytes(4).readUInt32BE(0) % 1000000).padStart(6, "0");
+}
+
+function idlePlayback(now) {
+  return {
+    status: "idle",
+    positionMs: 0,
+    durationMs: 0,
+    at: now,
+    rate: 1,
+    media: null,
+    audioTracks: [],
+    subtitleTracks: [],
+    subtitleDelayMs: 0,
+    hasNext: false,
+    error: null
+  };
+}
+
+function isLoopback(address) {
+  return address === "127.0.0.1" || address === "::1" || address === "localhost";
+}
+
+/**
+ * @param deps.tv      TV adapter (lib/tv.js): info(), volume(action), launchApp(), showCode(), hideCode()
+ * @param deps.store   persistent store (lib/store.js)
+ * @param deps.log     function(line)
+ * @param deps.now     optional clock, for tests
+ */
+function createHub(deps) {
+  var tv = deps.tv;
+  var store = deps.store;
+  var log = deps.log || function () {};
+  var now = deps.now || Date.now;
+
+  var phones = [];
+  var app = null;
+  var playback = idlePlayback(now());
+  var volume = { level: null, muted: false };
+  var pendingPlay = null;
+  var pendingTimer = null;
+  var tvInfo = { id: store.tvId(), name: "LG TV", model: null, platform: "webos" };
+
+  tv.info().then(function (info) {
+    if (info.name) tvInfo.name = info.name;
+    if (info.model) tvInfo.model = info.model;
+    log("tv: " + tvInfo.name + (tvInfo.model ? " (" + tvInfo.model + ")" : ""));
+  });
+
+  function send(connection, message) {
+    message.v = PROTOCOL_VERSION;
+    connection.sendJson(message);
+  }
+
+  function reply(phone, request, message) {
+    if (request && request.id != null) message.id = request.id;
+    send(phone.connection, message);
+  }
+
+  function pairedPhones() {
+    return phones.filter(function (phone) {
+      return phone.paired;
+    });
+  }
+
+  function broadcast(message) {
+    pairedPhones().forEach(function (phone) {
+      send(phone.connection, Object.assign({}, message));
+    });
+  }
+
+  function setPlayback(next) {
+    playback = next;
+    broadcast({ type: "state", playback: playback });
+  }
+
+  function sendVolume(target) {
+    var message = { type: "volume.state", level: volume.level, muted: volume.muted };
+    if (target) send(target.connection, message);
+    else broadcast(message);
+  }
+
+  // ------------------------------------------------------------ pairing
+
+  function activePairing() {
+    for (var i = 0; i < phones.length; i++) {
+      if (phones[i].pairing) return phones[i];
+    }
+    return null;
+  }
+
+  function showCode(phone) {
+    var clientName = (phone.client && phone.client.name) || "Phone";
+    if (app) send(app, { type: "pair.show", code: phone.pairing.code, clientName: clientName });
+    tv.showCode(phone.pairing.code, clientName);
+  }
+
+  function endPairing(phone) {
+    if (!phone.pairing) return;
+    phone.pairing = null;
+    if (!activePairing()) {
+      if (app) send(app, { type: "pair.hide" });
+      tv.hideCode();
+    }
+  }
+
+  function beginPairing(phone, request) {
+    // One code on screen at a time: a newer request replaces an older one.
+    phones.forEach(function (other) {
+      if (other !== phone && other.pairing) {
+        other.pairing = null;
+        reply(other, null, {
+          type: "error",
+          code: "pairing_replaced",
+          message: "Another device started pairing"
+        });
+      }
+    });
+    phone.pairing = { code: randomCode(), attempts: 0 };
+    log("pairing started by " + phone.connection.remoteAddress);
+    showCode(phone);
+  }
+
+  function confirmPairing(phone, request) {
+    if (!phone.pairing) {
+      reply(phone, request, { type: "error", code: "pairing_not_started" });
+      return;
+    }
+    var code = String(request.code || "").trim();
+    if (code !== phone.pairing.code) {
+      phone.pairing.attempts += 1;
+      log("pairing: wrong code (" + phone.pairing.attempts + ")");
+      if (phone.pairing.attempts >= MAX_CODE_ATTEMPTS) {
+        phone.pairing = { code: randomCode(), attempts: 0 };
+        showCode(phone);
+      }
+      reply(phone, request, { type: "error", code: "bad_code" });
+      return;
+    }
+    var token = crypto.randomBytes(24).toString("hex");
+    store.addToken(token, {
+      clientId: phone.client ? phone.client.id : null,
+      name: phone.client ? phone.client.name : null,
+      platform: phone.client ? phone.client.platform : null,
+      createdAt: now()
+    });
+    endPairing(phone);
+    phone.paired = true;
+    log("paired " + ((phone.client && phone.client.name) || phone.connection.remoteAddress));
+    reply(phone, request, { type: "pair.ok", token: token });
+  }
+
+  // ------------------------------------------------------------ playback
+
+  function clearPending() {
+    pendingPlay = null;
+    if (pendingTimer) clearTimeout(pendingTimer);
+    pendingTimer = null;
+  }
+
+  function play(request) {
+    var media = request.request && request.request.media;
+    if (!request.request || !request.request.stream || !request.request.stream.url) {
+      return { type: "error", code: "bad_request", message: "play needs request.stream.url" };
+    }
+    // Launching a running app just brings it to the front (webOSRelaunch).
+    tv.launchApp().then(function (result) {
+      if (!result.ok) log("launch failed: " + result.error);
+    });
+    if (app) {
+      send(app, { type: "play", request: request.request });
+    } else {
+      clearPending();
+      pendingPlay = request.request;
+      pendingTimer = setTimeout(function () {
+        if (!pendingPlay) return;
+        log("app did not connect in time, dropping play request");
+        clearPending();
+        var failed = idlePlayback(now());
+        failed.status = "error";
+        failed.media = media || null;
+        failed.error = "Nuvio did not start on the TV";
+        setPlayback(failed);
+        broadcast({ type: "error", code: "playback_failed", message: failed.error });
+      }, PENDING_PLAY_TIMEOUT_MS);
+    }
+    var loading = idlePlayback(now());
+    loading.status = "loading";
+    loading.media = media || null;
+    setPlayback(loading);
+    return null;
+  }
+
+  function command(request) {
+    if (!COMMANDS[request.action])
+      return { type: "error", code: "unknown_action", message: String(request.action) };
+    if (!app)
+      return { type: "error", code: "no_player", message: "Nuvio is not running on the TV" };
+    send(app, {
+      type: "cmd",
+      action: request.action,
+      positionMs: request.positionMs,
+      deltaMs: request.deltaMs,
+      trackId: request.trackId,
+      delayMs: request.delayMs
+    });
+    return null;
+  }
+
+  function changeVolume(phone, request) {
+    var action = String(request.action || "get");
+    tv.volume(action).then(function (result) {
+      if (result.level != null) volume.level = result.level;
+      if (result.muted != null) volume.muted = result.muted;
+      if (!result.ok)
+        reply(phone, request, { type: "error", code: "volume_failed", message: result.error });
+      sendVolume(null);
+    });
+  }
+
+  // ------------------------------------------------------------ connections
+
+  function handlePhoneMessage(phone, request) {
+    var type = String(request.type || "");
+    if (!phone.paired && !UNPAIRED_TYPES[type]) {
+      reply(phone, request, { type: "error", code: "not_paired" });
+      return;
+    }
+    var response = null;
+    switch (type) {
+      case "hello":
+        phone.client = request.client || null;
+        phone.paired = !!(request.token && store.touchToken(request.token, now()));
+        reply(phone, request, {
+          type: "welcome",
+          tv: tvInfo,
+          paired: phone.paired,
+          protocol: PROTOCOL_VERSION
+        });
+        if (phone.paired) {
+          send(phone.connection, { type: "state", playback: playback });
+          sendVolume(phone);
+        }
+        return;
+      case "pair.begin":
+        beginPairing(phone, request);
+        return;
+      case "pair.confirm":
+        confirmPairing(phone, request);
+        return;
+      case "ping":
+        reply(phone, request, { type: "pong", t: request.t, serverTime: now() });
+        return;
+      case "state.get":
+        reply(phone, request, { type: "state", playback: playback });
+        sendVolume(phone);
+        if (app) send(app, { type: "state.get" });
+        return;
+      case "play":
+        response = play(request);
+        break;
+      case "cmd":
+        response = command(request);
+        break;
+      case "volume":
+        changeVolume(phone, request);
+        return;
+      default:
+        response = { type: "error", code: "unknown_type", message: type };
+    }
+    if (response) reply(phone, request, response);
+  }
+
+  function handlePhone(connection) {
+    var phone = { connection: connection, client: null, paired: false, pairing: null };
+    phones.push(phone);
+    log("phone connected: " + connection.remoteAddress);
+    connection.on("message", function (text) {
+      var request;
+      try {
+        request = JSON.parse(text);
+      } catch (error) {
+        send(connection, { type: "error", code: "bad_json" });
+        return;
+      }
+      if (!request || typeof request !== "object") return;
+      handlePhoneMessage(phone, request);
+    });
+    connection.on("close", function () {
+      endPairing(phone);
+      var index = phones.indexOf(phone);
+      if (index >= 0) phones.splice(index, 1);
+      log("phone disconnected: " + connection.remoteAddress);
+    });
+  }
+
+  function handleApp(connection) {
+    if (!isLoopback(connection.remoteAddress)) {
+      connection.close(1008, "loopback only");
+      return;
+    }
+    if (app) app.close(1000, "replaced");
+    app = connection;
+    log("nuvio app connected");
+    connection.on("message", function (text) {
+      var message;
+      try {
+        message = JSON.parse(text);
+      } catch (error) {
+        return;
+      }
+      if (!message) return;
+      if (message.type === "app.hello") {
+        if (pendingPlay) {
+          send(connection, { type: "play", request: pendingPlay });
+          clearPending();
+        }
+        var pairing = activePairing();
+        if (pairing) showCode(pairing);
+      } else if (message.type === "state" && message.playback) {
+        setPlayback(Object.assign(idlePlayback(now()), message.playback));
+      }
+    });
+    connection.on("close", function () {
+      if (app !== connection) return;
+      app = null;
+      log("nuvio app disconnected");
+      if (!pendingPlay) setPlayback(idlePlayback(now()));
+    });
+  }
+
+  function handleConnection(connection) {
+    if (connection.path === "/app") handleApp(connection);
+    else handlePhone(connection);
+  }
+
+  var heartbeat = setInterval(function () {
+    if (playback.status === "playing" || playback.status === "buffering") {
+      broadcast({ type: "state", playback: playback });
+    }
+  }, STATE_HEARTBEAT_MS);
+  if (typeof heartbeat.unref === "function") heartbeat.unref();
+
+  return {
+    handleConnection: handleConnection,
+    status: function () {
+      return {
+        tv: tvInfo,
+        appConnected: !!app,
+        phones: phones.map(function (phone) {
+          return {
+            address: phone.connection.remoteAddress,
+            paired: phone.paired,
+            pairing: !!phone.pairing
+          };
+        }),
+        pairedDevices: store.listTokens().length,
+        playback: { status: playback.status, title: playback.media ? playback.media.title : null },
+        pendingPlay: !!pendingPlay
+      };
+    },
+    stop: function () {
+      clearInterval(heartbeat);
+      clearPending();
+    }
+  };
+}
+
+module.exports = { createHub: createHub, PROTOCOL_VERSION: PROTOCOL_VERSION };

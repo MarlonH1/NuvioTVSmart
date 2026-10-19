@@ -34,6 +34,10 @@ import { showAppUpdatePrompt } from "./ui/components/appUpdatePrompt.js";
 import { resolveExperienceRoute } from "./core/profile/experienceModeRouting.js";
 import { PluginRuntime } from "./core/player/pluginRuntime.js";
 import { installPartyEffects } from "./ui/screens/party/partyEffects.js";
+import {
+  isNuvioRemoteForegroundRequest,
+  startNuvioRemoteBridge
+} from "./core/remote/nuvioRemoteBridge.js";
 
 // These legacy Web-only overrides are no longer user settings. Navigation now
 // uses the stable grid algorithm and simulator detection automatically.
@@ -379,7 +383,9 @@ function setupWebOsAppLifecycle() {
       if (document.body) {
         document.body.style.removeProperty("display");
       }
-      const shouldReturnHome = !Router.isWebOsResumeRouteRestorable(current);
+      // A phone just asked Nuvio Remote to play something: the player is where we want to be.
+      const shouldReturnHome =
+        !Router.isWebOsResumeRouteRestorable(current) && !isNuvioRemoteForegroundRequest();
       if (shouldReturnHome) {
         await Router.navigate(
           "home",
@@ -677,6 +683,9 @@ async function bootstrapApp() {
   markBootStage("Checking authentication");
   await AuthManager.bootstrap();
   installPartyEffects();
+  if (Platform.isWebOS()) {
+    startNuvioRemoteBridge();
+  }
 }
 
 async function bootstrapAddonRemoteMode() {

@@ -292,6 +292,7 @@ export const SECTION_META = [
     subtitleKey: "settings.sections.profiles.subtitle"
   },
   { id: "watchParty", labelKey: "party_title", subtitleKey: "party_settings_description" },
+  { id: "nuvioRemote", labelKey: "nuvio_remote_title", subtitleKey: "nuvio_remote_settings_description" },
   {
     id: "appearance",
     labelKey: "settings.sections.appearance.label",
@@ -352,6 +353,7 @@ export const SECTION_ICONS = {
   account: "person",
   profiles: "people",
   watchParty: "groups",
+  nuvioRemote: "settings_remote",
   appearance: "palette",
   layout: "grid_view",
   contentDiscovery: "explore",

@@ -1,5 +1,6 @@
 import { Router } from "../../navigation/routerState.js";
 import { isWatchPartySectionVisible } from "./settingsWatchPartySection.js";
+import { isNuvioRemoteSectionVisible } from "./settingsNuvioRemoteSection.js";
 
 import { ScreenUtils } from "../../navigation/screen.js";
 
@@ -308,6 +309,9 @@ export function getVisibleSections(model) {
     }
     if (section.id === "watchParty") {
       return isWatchPartySectionVisible();
+    }
+    if (section.id === "nuvioRemote") {
+      return isNuvioRemoteSectionVisible();
     }
     return true;
   });
