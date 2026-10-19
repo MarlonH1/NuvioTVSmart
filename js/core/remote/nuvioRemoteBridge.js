@@ -7,6 +7,7 @@
 import { LocalStore } from "../storage/localStore.js";
 import { Router } from "../../ui/navigation/routerState.js";
 import { PlayerController } from "../player/playerController.js";
+import { findFollowingPostCreditsScene } from "../player/skipIntervalRules.js";
 import { showRemotePairingCode, hideRemotePairingCode } from "./nuvioRemotePairingOverlay.js";
 
 export const NUVIO_REMOTE_ENABLED_KEY = "nuvioRemoteEnabled";
@@ -340,6 +341,10 @@ async function runCommand(message) {
         player.setSubtitleDelayValue(Number(message.delayMs), { showOverlay: true });
       }
       break;
+    case "skip":
+      // Same path as the on-screen "Skip Intro"/"Skip Recap" button.
+      safe(() => player.skipActiveInterval());
+      break;
     default:
       break;
   }
@@ -370,6 +375,7 @@ function idleState() {
     subtitleTracks: [],
     subtitleDelayMs: 0,
     hasNext: false,
+    skip: null,
     error: null
   };
 }
@@ -398,6 +404,40 @@ function playerStatus(player) {
   if (!player.hasPresentedPlaybackFrame) return "loading";
   if (player.bufferingActive || player.loadingVisible || player.seekLoading) return "buffering";
   return player.paused ? "paused" : "playing";
+}
+
+// The segment the on-screen skip button would skip right now. Stays set for the whole interval,
+// even after the TV button auto-hides, so the phone can still offer it.
+function readSkip(player) {
+  const interval = player.activeSkipInterval;
+  if (!interval || !safe(() => player.isSkipIntroPlaybackReady(), false)) return null;
+  const type = String(interval.type || "")
+    .trim()
+    .toLowerCase();
+  const kind =
+    type === "recap"
+      ? "recap"
+      : type === "outro" || type === "ed" || type === "mixed-ed"
+        ? "outro"
+        : type === "movie-credits"
+          ? "credits"
+          : "intro";
+  const postCredits =
+    (kind === "outro" || kind === "credits") &&
+    Boolean(
+      safe(() =>
+        findFollowingPostCreditsScene(
+          interval,
+          player.skipIntervals,
+          player.getPlaybackDurationSeconds()
+        )
+      )
+    );
+  return {
+    kind,
+    postCredits,
+    endMs: Math.round((Number(interval.endTime) || 0) * 1000)
+  };
 }
 
 function trackLang(entry) {
@@ -442,6 +482,7 @@ export function readPlaybackState(player) {
     subtitleTracks,
     subtitleDelayMs: Number(player.subtitleDelayMs) || 0,
     hasNext: Boolean(safe(() => player.resolveNextEpisodeInfo(), null)),
+    skip: readSkip(player),
     error: status === "error" ? "Playback failed" : null
   };
 }

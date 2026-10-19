@@ -123,6 +123,16 @@ const fakePlayer = {
     playerCalls.push(["delay", ms]);
     this.subtitleDelayMs = ms;
   },
+  activeSkipInterval: null,
+  skipIntervals: [],
+  isSkipIntroPlaybackReady: () => true,
+  skipActiveInterval() {
+    if (!this.activeSkipInterval) return false;
+    playerCalls.push(["skip"]);
+    this.positionSec = this.activeSkipInterval.endTime;
+    this.activeSkipInterval = null;
+    return true;
+  },
   async playNextEpisode() {
     playerCalls.push(["next"]);
   },
@@ -292,6 +302,15 @@ try {
   await phone.next("state", (m) => m.playback.subtitleTracks.every((track) => !track.selected));
   phone.send({ type: "cmd", action: "subtitleDelay", delayMs: -250 });
   await phone.next("state", (m) => m.playback.subtitleDelayMs === -250);
+  // An active recap shows up in the state; "skip" jumps past it like the TV button.
+  fakePlayer.activeSkipInterval = { type: "recap", startTime: 3500, endTime: 3550 };
+  fakePlayer.skipIntervals = [fakePlayer.activeSkipInterval];
+  const withSkip = await phone.next("state", (m) => m.playback.skip?.kind === "recap");
+  assert.equal(withSkip.playback.skip.endMs, 3550000);
+  assert.equal(withSkip.playback.skip.postCredits, false);
+  phone.send({ type: "cmd", action: "skip" });
+  await waitFor(() => fakePlayer.positionSec === 3550, "skip seek");
+  await phone.next("state", (m) => m.playback.skip == null);
   phone.send({ type: "cmd", action: "next" });
   await waitFor(() => playerCalls.some((call) => call[0] === "next"), "next episode");
   phone.send({ type: "cmd", action: "stop" });
@@ -299,7 +318,7 @@ try {
 
   assert.deepEqual(
     playerCalls.map((call) => call[0]),
-    ["media", "seek", "seek", "audio", "subtitle", "subtitle", "delay", "next", "stop"]
+    ["media", "seek", "seek", "audio", "subtitle", "subtitle", "delay", "skip", "next", "stop"]
   );
 
   // A second play while the player is open replaces the route instead of stacking it.
