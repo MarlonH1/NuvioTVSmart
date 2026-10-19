@@ -15,7 +15,13 @@ var crypto = require("crypto");
 
 var PROTOCOL_VERSION = 1;
 var PENDING_PLAY_TIMEOUT_MS = 45000;
-var STATE_HEARTBEAT_MS = 5000;
+// The phone interpolates the position itself; the app sends extra updates on drift, so a slow
+// heartbeat is enough and saves phone battery during long playback.
+var STATE_HEARTBEAT_MS = 30000;
+// /watch: one idle HTTP stream per phone watcher (remote/magisk). Lines only on start/stop of
+// playback plus a keepalive, so the phone sleeps in between.
+var WATCH_KEEPALIVE_MS = 600000;
+var ACTIVE_STATUSES = { loading: true, playing: true, paused: true, buffering: true };
 var MAX_CODE_ATTEMPTS = 5;
 var UNPAIRED_TYPES = { hello: true, "pair.begin": true, "pair.confirm": true, ping: true };
 var COMMANDS = {
@@ -68,6 +74,7 @@ function createHub(deps) {
   var now = deps.now || Date.now;
 
   var phones = [];
+  var watchers = [];
   var app = null;
   var playback = idlePlayback(now());
   var volume = { level: null, muted: false };
@@ -103,9 +110,61 @@ function createHub(deps) {
     });
   }
 
+  function isActive(state) {
+    return !!(state && state.media && ACTIVE_STATUSES[state.status]);
+  }
+
+  function watchLine() {
+    var media = playback.media || {};
+    return (
+      JSON.stringify({
+        type: "watch",
+        active: isActive(playback),
+        status: playback.status,
+        title: media.title || null
+      }) + "\n"
+    );
+  }
+
+  function notifyWatchers() {
+    var line = watchLine();
+    watchers.forEach(function (watcher) {
+      watcher.write(line);
+    });
+  }
+
   function setPlayback(next) {
+    var wasActive = isActive(playback);
     playback = next;
     broadcast({ type: "state", playback: playback });
+    if (wasActive !== isActive(playback)) notifyWatchers();
+  }
+
+  function handleWatch(req, res) {
+    var query = String(req.url || "").split("?")[1] || "";
+    var token = null;
+    query.split("&").forEach(function (pair) {
+      var parts = pair.split("=");
+      if (parts[0] === "token") token = decodeURIComponent(parts[1] || "");
+    });
+    if (!token || !store.hasToken(token)) {
+      res.writeHead(401, { "Content-Type": "text/plain" });
+      res.end("not paired\n");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" });
+    if (res.socket) res.socket.setKeepAlive(true, WATCH_KEEPALIVE_MS);
+    res.write(watchLine());
+    watchers.push(res);
+    log("watcher connected: " + (req.socket && req.socket.remoteAddress));
+    var keepalive = setInterval(function () {
+      res.write('{"type":"ka"}\n');
+    }, WATCH_KEEPALIVE_MS);
+    req.on("close", function () {
+      clearInterval(keepalive);
+      var index = watchers.indexOf(res);
+      if (index >= 0) watchers.splice(index, 1);
+    });
   }
 
   function sendVolume(target) {
@@ -377,6 +436,7 @@ function createHub(deps) {
 
   return {
     handleConnection: handleConnection,
+    handleWatch: handleWatch,
     status: function () {
       return {
         tv: tvInfo,
@@ -395,6 +455,9 @@ function createHub(deps) {
     },
     stop: function () {
       clearInterval(heartbeat);
+      watchers.slice().forEach(function (watcher) {
+        watcher.end();
+      });
       clearPending();
     }
   };

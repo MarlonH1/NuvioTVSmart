@@ -38,6 +38,9 @@ function createStore(file, log) {
       data.tokens[token] = Object.assign({ lastSeenAt: info.createdAt }, info);
       save();
     },
+    hasToken: function (token) {
+      return Object.prototype.hasOwnProperty.call(data.tokens, token);
+    },
     /** Returns true when the token is known; refreshes its lastSeenAt. */
     touchToken: function (token, now) {
       var entry = data.tokens[token];

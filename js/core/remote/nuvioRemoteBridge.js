@@ -15,7 +15,8 @@ const DAEMON_URL = globalThis.__NUVIO_REMOTE_DAEMON_URL__ || "ws://127.0.0.1:478
 const RECONNECT_MIN_MS = 2000;
 const RECONNECT_MAX_MS = 30000;
 const STATE_POLL_MS = 1000;
-const STATE_HEARTBEAT_MS = 5000;
+// Drift corrections go out immediately, so the periodic refresh can be slow (phone battery).
+const STATE_HEARTBEAT_MS = 30000;
 const READY_WAIT_MS = 30000;
 const FOREGROUND_GUARD_MS = 8000;
 const REMOTE_STREAM_ID = "nuvio-remote";
@@ -378,7 +379,7 @@ function playerMedia(player) {
   const itemType = String(params.itemType || "movie");
   return {
     type: itemType === "series" || itemType === "tv" ? "series" : "movie",
-    metaId: params.itemId || null,
+    metaId: String(params.itemId || ""),
     metaType: itemType,
     videoId: params.videoId || null,
     season: params.season ?? null,

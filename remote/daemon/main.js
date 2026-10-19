@@ -59,6 +59,10 @@ var startedAt = Date.now();
 var responder = null;
 
 var server = http.createServer(function (req, res) {
+  if (String(req.url || "").indexOf("/watch") === 0) {
+    hub.handleWatch(req, res);
+    return;
+  }
   // GET / is a reachability check that works from any browser on the LAN.
   res.writeHead(200, {
     "Content-Type": "application/json; charset=utf-8",
@@ -83,7 +87,12 @@ var server = http.createServer(function (req, res) {
   );
 });
 
-var wsServer = attachWebSocketServer(server, { paths: ["/ws", "/app"] }, hub.handleConnection);
+var wsServer = attachWebSocketServer(
+  server,
+  // Long ping interval: idle phones should not be woken every few seconds.
+  { paths: ["/ws", "/app"], heartbeatMs: 60000 },
+  hub.handleConnection
+);
 
 function startDiscovery(port) {
   var id = store.tvId().slice(0, 4);

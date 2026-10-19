@@ -12,6 +12,49 @@ const { attachWebSocketServer } = require("../lib/ws");
 const { createHub } = require("../lib/hub");
 const { createStore } = require("../lib/store");
 const { createTv, readVolume } = require("../lib/tv");
+const net = require("node:net");
+
+// Same request the Magisk watcher sends: HTTP/1.0 over a raw socket, read line by line.
+function openWatch(port, token) {
+  const socket = net.connect(port, "127.0.0.1");
+  socket.write(`GET /watch?token=${token} HTTP/1.0\r\n\r\n`);
+  let buffer = "";
+  let raw = "";
+  const lines = [];
+  const waiters = [];
+  socket.on("data", (chunk) => {
+    raw += chunk.toString();
+    buffer += chunk.toString();
+    let index;
+    while ((index = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, index).trim();
+      buffer = buffer.slice(index + 1);
+      if (!line.startsWith("{")) continue;
+      const message = JSON.parse(line);
+      const waiter = waiters.shift();
+      if (waiter) waiter(message);
+      else lines.push(message);
+    }
+  });
+  const ended = new Promise((resolve) => socket.on("close", () => resolve(raw)));
+  return {
+    socket,
+    ended,
+    next: () =>
+      lines.length
+        ? Promise.resolve(lines.shift())
+        : new Promise((resolve, reject) => {
+            const timer = setTimeout(
+              () => reject(new Error("timeout waiting for watch line")),
+              2000
+            );
+            waiters.push((m) => {
+              clearTimeout(timer);
+              resolve(m);
+            });
+          })
+  };
+}
 
 function fakeTv() {
   const calls = [];
@@ -88,7 +131,10 @@ async function setup() {
   const tv = fakeTv();
   const store = createStore(path.join(dir, "state.json"));
   const hub = createHub({ tv, store });
-  const server = http.createServer();
+  const server = http.createServer((req, res) => {
+    if (req.url.startsWith("/watch")) hub.handleWatch(req, res);
+    else res.end();
+  });
   const ws = attachWebSocketServer(server, { paths: ["/ws", "/app"] }, hub.handleConnection);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = "ws://127.0.0.1:" + server.address().port;
@@ -106,7 +152,7 @@ async function setup() {
     server.close();
     fs.rmSync(dir, { recursive: true, force: true });
   };
-  return { tv, hub, store, dir, connect, teardown };
+  return { tv, hub, store, dir, connect, teardown, port: server.address().port };
 }
 
 async function pairPhone(env) {
@@ -297,4 +343,45 @@ test("tv adapter falls back between luna APIs and parses volume replies", async 
     level: 5,
     muted: true
   });
+});
+
+test("watch stream reports only playback start/stop and rejects unknown tokens", async () => {
+  const env = await setup();
+  try {
+    const stranger = openWatch(env.port, "nope");
+    assert.match(await stranger.ended, /401/);
+
+    const { phone, token } = await pairPhone(env);
+    const watch = openWatch(env.port, token);
+    assert.deepStrictEqual(await watch.next(), {
+      type: "watch",
+      active: false,
+      status: "idle",
+      title: null
+    });
+
+    const app = await env.connect("/app");
+    app.send({ type: "app.hello" });
+    const media = { type: "movie", title: "Dune" };
+    app.send({ type: "state", playback: { status: "playing", media } });
+    assert.deepStrictEqual(await watch.next(), {
+      type: "watch",
+      active: true,
+      status: "playing",
+      title: "Dune"
+    });
+    // Pause/seek are not interesting for the watcher: no line.
+    app.send({ type: "state", playback: { status: "paused", media, positionMs: 10 } });
+    app.send({ type: "state", playback: { status: "idle" } });
+    assert.deepStrictEqual(await watch.next(), {
+      type: "watch",
+      active: false,
+      status: "idle",
+      title: null
+    });
+    watch.socket.destroy();
+    phone.close();
+  } finally {
+    env.teardown();
+  }
 });
