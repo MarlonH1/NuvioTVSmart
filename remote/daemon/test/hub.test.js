@@ -328,7 +328,7 @@ test("volume changes are broadcast to every paired phone", async () => {
 test("tv adapter falls back between luna APIs and parses volume replies", async () => {
   const seen = [];
   const tv = createTv({
-    appId: "space.nuvio.webos",
+    appId: "com.marlon.nuvio",
     call: (uri, params) => {
       seen.push(uri);
       if (uri.includes("master/volumeUp"))
@@ -417,7 +417,7 @@ test("slider drags only apply the newest absolute volume", async () => {
 test("tv adapter sets absolute volume via luna", async () => {
   const seen = [];
   const tv = createTv({
-    appId: "space.nuvio.webos",
+    appId: "com.marlon.nuvio",
     call: (uri, params) => {
       seen.push([uri, params]);
       if (uri.endsWith("master/setVolume")) return Promise.resolve({ returnValue: true });

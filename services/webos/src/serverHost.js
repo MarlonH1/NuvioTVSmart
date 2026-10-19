@@ -6,7 +6,7 @@ var Module = require("module");
 var createImageProxyHandler = require("./imageProxy").createImageProxyHandler;
 var createSupabaseProxyHandler = require("./supabaseProxy").createSupabaseProxyHandler;
 
-var SERVICE_ID = "space.nuvio.webos.service";
+var SERVICE_ID = "com.marlon.nuvio.service";
 var PORT_CANDIDATES = require("./constants").PORT_CANDIDATES;
 var REQUEST_TIMEOUT_MS = 5000;
 

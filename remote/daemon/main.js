@@ -3,7 +3,7 @@
 // so it is reachable while Nuvio itself is closed.
 //
 //   node main.js [--port 47800] [--state /var/lib/nuvio-remote/state.json]
-//                [--app-id space.nuvio.webos] [--luna-send luna-send] [--no-luna]
+//                [--app-id com.marlon.nuvio] [--luna-send luna-send] [--no-luna]
 //
 // Phones connect to ws://<tv>:<port>/ws, the Nuvio app to ws://127.0.0.1:<port>/app.
 "use strict";
@@ -24,7 +24,7 @@ function parseArgs(argv) {
   var options = {
     port: Number(process.env.NUVIO_REMOTE_PORT) || 47800,
     state: process.env.NUVIO_REMOTE_STATE || "/var/lib/nuvio-remote/state.json",
-    appId: process.env.NUVIO_REMOTE_APP_ID || "space.nuvio.webos",
+    appId: process.env.NUVIO_REMOTE_APP_ID || "com.marlon.nuvio",
     lunaSend: process.env.NUVIO_REMOTE_LUNA_SEND || "luna-send",
     luna: true
   };

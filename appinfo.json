@@ -1,5 +1,5 @@
 {
-  "id": "space.nuvio.webos",
+  "id": "com.marlon.nuvio",
   "version": "1.2.8",
   "vendor": "Nuvio Media",
   "type": "web",
@@ -15,7 +15,7 @@
   "handlesRelaunch": true,
   "resolution": "1920x1080",
   "transparent": false,
-  "services": ["space.nuvio.webos.service"],
+  "services": ["com.marlon.nuvio.service"],
   "requiredPermissions": ["internet", "media.operation", "media.query"],
   "requiredACG": [
     "application.launcher",

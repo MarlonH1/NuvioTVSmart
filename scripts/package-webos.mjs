@@ -14,12 +14,12 @@ const distDir = path.join(rootDir, "dist");
 const cacheDir = path.join(rootDir, ".cache");
 const stagingDir = path.join(cacheDir, "webos-package");
 const appStageDir = path.join(stagingDir, "app");
-const serviceStageDir = path.join(stagingDir, "space.nuvio.webos.service");
-const pluginServiceStageDir = path.join(stagingDir, "space.nuvio.webos.plugin.service");
+const serviceStageDir = path.join(stagingDir, "com.marlon.nuvio.service");
+const pluginServiceStageDir = path.join(stagingDir, "com.marlon.nuvio.plugin.service");
 
 const appName = "Nuvio TV";
-const webOsServiceId = "space.nuvio.webos.service";
-const webOsPluginServiceId = "space.nuvio.webos.plugin.service";
+const webOsServiceId = "com.marlon.nuvio.service";
+const webOsPluginServiceId = "com.marlon.nuvio.plugin.service";
 const webOsServiceSourceDir = path.join(rootDir, "services", "webos");
 const webOsPluginServiceSourceDir = path.join(rootDir, "services", "webos", "plugin");
 const webOsRuntimeScriptPath = "assets/libs/webOSTV.js";
@@ -326,7 +326,7 @@ async function packageWebOs() {
     ]);
   } catch (error) {
     const { version } = await readAppMetadata();
-    const expectedIpk = path.join(rootDir, `space.nuvio.webos_${version}_all.ipk`);
+    const expectedIpk = path.join(rootDir, `com.marlon.nuvio_${version}_all.ipk`);
     if (await pathExists(expectedIpk)) {
       console.warn(
         `ares-package exited with an error, but ${expectedIpk} was created successfully. Continuing.`
