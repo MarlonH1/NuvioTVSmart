@@ -1,0 +1,18 @@
+{
+  "id": "space.nuvio.remotespike.service",
+  "description": "Nuvio Remote feasibility spike: LAN WebSocket + mDNS + Luna audio",
+  "services": [
+    {
+      "name": "space.nuvio.remotespike.service",
+      "description": "Spike endpoints",
+      "commands": [
+        {
+          "name": "status",
+          "description": "Status subscription (keeps the service alive)",
+          "public": true
+        },
+        { "name": "volume", "description": "Try Luna audio calls", "public": true }
+      ]
+    }
+  ]
+}

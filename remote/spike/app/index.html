@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Nuvio Remote Spike</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 48px 64px;
+        background: #0e0f12;
+        color: #e8e8ea;
+        font: 26px/1.45 sans-serif;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 44px;
+      }
+      .hint {
+        color: #9a9ca3;
+        font-size: 22px;
+        margin-bottom: 28px;
+      }
+      .grid {
+        display: flex;
+        gap: 48px;
+      }
+      .col {
+        flex: 1;
+        min-width: 0;
+      }
+      .k {
+        color: #9a9ca3;
+      }
+      .ok {
+        color: #5fd38d;
+      }
+      .bad {
+        color: #ff6b6b;
+      }
+      pre {
+        background: #17181d;
+        padding: 16px 20px;
+        border-radius: 12px;
+        font-size: 18px;
+        line-height: 1.35;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 560px;
+        overflow: hidden;
+      }
+      .big {
+        font-size: 34px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Nuvio Remote – Machbarkeits-Spike</h1>
+    <div class="hint">
+      Diese Seite hält eine Luna-Subscription offen. Zurück-Taste beendet die App. Taste 1/2/3 =
+      Lautstärke +/−/Abfrage (testet Luna-Audio).
+    </div>
+    <div class="grid">
+      <div class="col">
+        <div><span class="k">Service:</span> <span id="svc" class="bad">verbinde…</span></div>
+        <div><span class="k">Adresse:</span> <span id="addr" class="big">–</span></div>
+        <div><span class="k">mDNS:</span> <span id="mdns">–</span></div>
+        <div><span class="k">Beacon:</span> <span id="beacon">–</span></div>
+        <div><span class="k">Clients:</span> <span id="clients">–</span></div>
+        <div><span class="k">Luna-Audio:</span> <span id="luna">noch nicht getestet</span></div>
+        <div><span class="k">Uptime / Node / uid:</span> <span id="misc">–</span></div>
+        <div><span class="k">Sichtbarkeit:</span> <span id="vis">–</span></div>
+      </div>
+      <div class="col">
+        <pre id="log">(Service-Log)</pre>
+      </div>
+    </div>
+    <script>
+      var SERVICE = "luna://space.nuvio.remotespike.service/";
+      var bridges = [];
+
+      function lunaCall(method, params, onResponse, subscribe) {
+        var bridge = new PalmServiceBridge();
+        var payload = params || {};
+        if (subscribe) payload.subscribe = true;
+        bridge.onservicecallback = function (raw) {
+          var data;
+          try {
+            data = JSON.parse(raw);
+          } catch (e) {
+            data = { returnValue: false, errorText: String(raw) };
+          }
+          onResponse(data);
+        };
+        bridge.call(SERVICE + method, JSON.stringify(payload));
+        // Keep a reference: a garbage-collected bridge cancels the call.
+        bridges.push(bridge);
+        return bridge;
+      }
+
+      function set(id, text, ok) {
+        var el = document.getElementById(id);
+        el.textContent = text;
+        if (ok === true) el.className = "ok";
+        else if (ok === false) el.className = "bad";
+      }
+
+      function render(s) {
+        if (!s || s.returnValue === false) {
+          set("svc", "Fehler: " + JSON.stringify(s), false);
+          return;
+        }
+        set("svc", "läuft (" + s.serviceId + ")", true);
+        var ips = (s.interfaces || []).map(function (i) {
+          return i.address;
+        });
+        if (s.port) {
+          set(
+            "addr",
+            ips
+              .map(function (ip) {
+                return ip + ":" + s.port;
+              })
+              .join("  ") || "Port " + s.port,
+            true
+          );
+        } else {
+          set("addr", "kein Port: " + s.listenError, false);
+        }
+        var m = s.mdns || {};
+        set(
+          "mdns",
+          (m.mode || "–") +
+            (m.error ? " (" + m.error + ")" : "") +
+            " · Anfragen " +
+            (m.queriesSeen || 0) +
+            " · Antworten " +
+            (m.answersSent || 0) +
+            (m.lastQueryFrom ? " · zuletzt " + m.lastQueryFrom : ""),
+          m.mode === "shared-5353"
+        );
+        var b = s.beacon || {};
+        set("beacon", b.ok ? "sendet (" + b.sent + ")" : "aus " + (b.error || ""), !!b.ok);
+        set(
+          "clients",
+          (s.clients || []).join(", ") || "keine",
+          (s.clients || []).length > 0 ? true : undefined
+        );
+        var luna = s.luna || {};
+        var keys = Object.keys(luna);
+        if (keys.length) {
+          set(
+            "luna",
+            keys
+              .map(function (k) {
+                var last = luna[k][luna[k].length - 1];
+                return (
+                  k +
+                  ": " +
+                  (last && last.result && last.result.returnValue
+                    ? "OK (" + last.uri.replace("luna://", "") + ")"
+                    : "FEHLER")
+                );
+              })
+              .join(" · ")
+          );
+        }
+        set("misc", s.uptimeSec + " s / " + s.nodeVersion + " / " + s.uid);
+        document.getElementById("log").textContent = (s.log || []).join("\n");
+      }
+
+      lunaCall("status", {}, render, true);
+
+      document.addEventListener("visibilitychange", function () {
+        set(
+          "vis",
+          document.hidden ? "Hintergrund seit " + new Date().toLocaleTimeString() : "Vordergrund"
+        );
+      });
+      set("vis", "Vordergrund");
+
+      document.addEventListener("keydown", function (e) {
+        var action = { 49: "up", 50: "down", 51: "get" }[e.keyCode];
+        if (action) {
+          lunaCall("volume", { action: action }, function (r) {
+            set(
+              "luna",
+              action +
+                ": " +
+                (r.returnValue
+                  ? "OK via " + r.uri
+                  : "FEHLER " + JSON.stringify(r.attempts || r).slice(0, 300)),
+              !!r.returnValue
+            );
+          });
+        }
+        if (e.keyCode === 461 || e.keyCode === 27) {
+          window.close();
+        }
+      });
+    </script>
+  </body>
+</html>

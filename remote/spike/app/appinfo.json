@@ -1,0 +1,14 @@
+{
+  "id": "space.nuvio.remotespike",
+  "version": "0.0.1",
+  "vendor": "Nuvio Remote Spike",
+  "type": "web",
+  "main": "index.html",
+  "title": "Nuvio Remote Spike",
+  "icon": "icon.png",
+  "iconColor": "#0e0f12",
+  "resolution": "1920x1080",
+  "handlesRelaunch": true,
+  "services": ["space.nuvio.remotespike.service"],
+  "requiredPermissions": ["internet", "audio.operation"]
+}
