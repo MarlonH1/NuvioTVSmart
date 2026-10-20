@@ -150,6 +150,7 @@ export function createDefaultExpandedState(sectionId) {
     return {
       general: false,
       stream: false,
+      controls: false,
       audio: false,
       subtitles: false,
       p2p: false
