@@ -37,9 +37,7 @@ export function createPlayerScreenMethods38() {
             : Number(PlayerController.video?.readyState || 0);
         if (startup) {
           if (this.markPlaybackPresentedAfterAdvance()) {
-            this.loadingVisible = false;
-            this.updateLoadingVisibility();
-            this.updateUiTick();
+            this.presentStartedPlayback();
             return;
           }
           if (!Environment.isWebOS() && (readyState >= 3 || (this.currentEngineFsStream && this.isEngineFsStartupReady()))) {

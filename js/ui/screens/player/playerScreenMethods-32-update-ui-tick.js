@@ -14,6 +14,11 @@ export function createPlayerScreenMethods32() {
         return;
       }
       this.syncPlayerStreamSource();
+      // Several paths hide the startup overlay without presentStartedPlayback()
+      // (stall guard, buffering, key handling); never leave its mute behind.
+      if (PlayerController.startupPresentationAudioMuted && this.hasPresentedPlaybackFrame && !this.loadingVisible) {
+        PlayerController.setStartupPresentationAudioMuted?.(false);
+      }
       this.ensureNextEpisodeStreamsPrefetch();
       this.shouldShowNextEpisodeCard();
       void this.refreshLoadingOverlayProgress();
