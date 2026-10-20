@@ -1038,9 +1038,3 @@
   color: var(--text-secondary);
   font-size: 22px;
 }
-.nuvio-dialog-actions.personal-rating-actions {
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 16px 24px;
-}

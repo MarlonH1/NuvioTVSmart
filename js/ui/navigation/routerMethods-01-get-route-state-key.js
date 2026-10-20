@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./router.js";
+import { NuvioDialog } from "../components/nuvioDialog.js";
 
 export function createRouterMethods01() {
   const { Platform, RouteStateStore, NON_BACKSTACK_ROUTES, getStackEntryRoute, getStackEntryParams, resolvePendingHistoryReturnParams } =
@@ -151,6 +152,10 @@ export function createRouterMethods01() {
           return;
         }
         if (Date.now() < Number(this.suppressPopstateUntil || 0)) {
+          this.restoreCurrentHistoryState(state);
+          return;
+        }
+        if (NuvioDialog.dismissTopmost()) {
           this.restoreCurrentHistoryState(state);
           return;
         }

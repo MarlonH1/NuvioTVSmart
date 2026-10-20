@@ -43,7 +43,18 @@
  *   dialog.destroy();              // animated exit then removes from DOM
  */
 
+// Open dialogs, oldest first. webOS delivers the remote's Back as a history
+// popstate rather than a key event, so the router closes the topmost one.
+const openDialogs = [];
+
 export class NuvioDialog {
+  static dismissTopmost() {
+    const dialog = openDialogs[openDialogs.length - 1];
+    if (!dialog) return false;
+    dialog._dismiss();
+    return true;
+  }
+
   constructor({
     title,
     subtitle = null,
@@ -185,6 +196,7 @@ export class NuvioDialog {
 
     this._backdrop = backdrop;
     this._panel = panel;
+    openDialogs.push(this);
 
     // Dismiss on backdrop click (outside panel)
     backdrop.addEventListener("click", (e) => {
@@ -334,6 +346,8 @@ export class NuvioDialog {
   destroy({ afterExit = null } = {}) {
     if (this._destroyed) return;
     this._destroyed = true;
+    const openIndex = openDialogs.indexOf(this);
+    if (openIndex >= 0) openDialogs.splice(openIndex, 1);
     document.removeEventListener("nuvio:ambient-shown", this._ambientHandler);
     window.removeEventListener("keydown", this._keyHandler, { capture: true });
     window.removeEventListener("keyup", this._keyUpHandler, { capture: true });

@@ -1,6 +1,7 @@
 // Picker for personal ratings, laid out like a TV slider: the slider is focused
 // first and Left/Right change the value in 0.5 steps (digits jump to a whole
-// number); OK saves. Down moves to Save/Remove/Cancel, Up returns to the slider.
+// number); OK saves. Down continues into the Save/Remove/Cancel list and Up
+// from Save returns to the slider. Back closes it (via the router on webOS).
 import { NuvioDialog } from "./nuvioDialog.js";
 import { I18n } from "../../i18n/index.js";
 import {
@@ -90,13 +91,14 @@ class PersonalRatingDialog extends NuvioDialog {
       }
       return;
     }
-    if (key.isUp) {
+    if (key.isUp && this._focusedIndex === 0) {
       event.preventDefault();
       event.stopPropagation();
       this.focusSlider();
       return;
     }
-    if (key.isDown) {
+    // The buttons are a vertical list: Up/Down move through it, Left/Right do nothing.
+    if (key.isLeft || key.isRight) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -115,7 +117,6 @@ export function showPersonalRatingDialog({ title, rating = null, onSave }) {
     subtitle: title || null,
     widthVw: 43.75,
     panelClassName: "personal-rating-dialog",
-    actionsClassName: "personal-rating-actions",
     content: () => {
       const wrap = document.createElement("div");
       wrap.className = "personal-rating-body";

@@ -50,6 +50,8 @@ function hasActiveModal() {
 }
 
 const BACK_DEBOUNCE_MS = 250;
+// OK on a focused <button> also makes the browser fire a click (detail 0).
+const KEYBOARD_CLICK_ECHO_MS = 500;
 
 export const FocusEngine = {
   lastBackHandledAt: 0,
@@ -58,6 +60,7 @@ export const FocusEngine = {
   pendingPointerMoveEvent: null,
   activeKeyDownStartedAt: new Map(),
   activeBackKeyIdentities: new Set(),
+  lastEnterKeyDownAt: 0,
 
   init() {
     this.boundHandleKey = this.handleKey.bind(this);
@@ -114,6 +117,9 @@ export const FocusEngine = {
   },
 
   handleKey(event) {
+    if (Number(event?.keyCode || 0) === 13 || event?.key === "Enter") {
+      this.lastEnterKeyDownAt = Date.now();
+    }
     if (event?.target && !document.contains(event.target)) {
       return;
     }
@@ -368,6 +374,15 @@ export const FocusEngine = {
       return;
     }
     if (typeof currentScreen?.onPointerActivate !== "function") {
+      return;
+    }
+    // The key press already ran this action through onKeyDown; replaying the
+    // click echo would run it twice (e.g. Watched marked, then unmarked).
+    // Magic Remote pointer clicks report detail >= 1 and still activate.
+    if (event?.detail === 0 && Date.now() - this.lastEnterKeyDownAt < KEYBOARD_CLICK_ECHO_MS) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      event?.stopImmediatePropagation?.();
       return;
     }
     const handled = currentScreen.onPointerActivate(target, event);
