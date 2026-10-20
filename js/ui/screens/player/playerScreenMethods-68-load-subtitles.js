@@ -225,9 +225,10 @@ export function createPlayerScreenMethods68() {
         this.stickyProgressFocus = false;
         this.moreActionsVisible = true;
         this.controlFocusZone = "buttons";
+        const firstMoreAction = this.getFirstMoreControlAction();
         this.controlFocusIndex = Math.max(
           0,
-          this.getControlDefinitions().findIndex((entry) => entry.action === "speed")
+          this.getControlDefinitions().findIndex((entry) => entry.action === firstMoreAction)
         );
         this.renderControlButtons();
         return;

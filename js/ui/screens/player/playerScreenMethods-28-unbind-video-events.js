@@ -2,6 +2,8 @@
 import * as internals from "./playerScreenContext.js";
 
 import { PartyRepository } from "../../../core/party/partyRepository.js";
+import { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
+import { arrangePlayerControls } from "../../../core/player/playerCustomization.js";
 
 export function createPlayerScreenMethods28() {
   const { PlayerController, t, clamp, escapeHtml } = internals;
@@ -25,32 +27,24 @@ export function createPlayerScreenMethods28() {
       const paused = this.getPlaybackControlPaused();
       const uiState = this.getPlayerUiState();
       const nextEpisode = this.resolveNextEpisodeInfo();
-      const base = [
-        {
-          action: "playPause",
-          label: paused ? ">" : "II",
-          icon: paused ? "assets/icons/ic_player_play.svg" : "assets/icons/ic_player_pause.svg",
-          title: "Play/Pause",
-          primary: true
-        }
-      ];
+      const available = {};
 
       if (nextEpisode?.hasAired && !this.nextEpisodeLaunching) {
-        base.push({
+        available.playNextEpisode = {
           action: "playNextEpisode",
           icon: "assets/icons/ic_player_skip_next.svg",
           useMask: true,
           title: t("next_episode_label", {}, "Next episode")
-        });
+        };
       }
 
-      base.push({
+      available.subtitleDialog = {
         action: "subtitleDialog",
         icon: "assets/icons/ic_player_subtitles.svg",
         title: t("subtitle_dialog_title", {}, "Subtitles")
-      });
+      };
 
-      base.push({
+      available.audioTrack = {
         action: "audioTrack",
         icon:
           this.selectedAudioTrackIndex >= 0 || this.selectedManifestAudioTrackId
@@ -58,63 +52,83 @@ export function createPlayerScreenMethods28() {
             : "assets/icons/ic_player_audio_outline.svg",
         useMask: true,
         title: t("audio_dialog_title", {}, "Audio")
-      });
+      };
 
-      base.push({
+      available.source = {
         action: "source",
         icon: "assets/icons/ic_player_source.svg",
         title: t("sources_title", {}, "Sources")
-      });
+      };
 
       if (Array.isArray(uiState.episodesAll) && uiState.episodesAll.length) {
-        base.push({
+        available.episodes = {
           action: "episodes",
           icon: "assets/icons/ic_player_episodes.svg",
           title: t("episodes_panel_title", {}, "Episodes")
-        });
+        };
       }
 
       if (this.isPartyButtonAvailable?.()) {
-        base.push({
+        available.party = {
           action: "party",
           icon: "assets/icons/ic_player_party.svg",
           useMask: true,
           title: t("party_title", {}, "Watch party"),
           className: PartyRepository.getState().party ? "is-party-active" : ""
-        });
+        };
       }
 
-      base.push({
-        action: "more",
-        label: this.moreActionsVisible ? "<" : ">",
-        title: t("player_more_actions_title", {}, "More Actions")
-      });
+      if (this.getPlaybackSpeedOptions().length > 1) {
+        const playbackSpeed = this.getPlaybackSpeed();
+        available.speed = {
+          action: "speed",
+          label: `${playbackSpeed.toFixed(playbackSpeed % 1 ? 2 : 0)}x`,
+          title: t("player_playback_speed", {}, "Playback speed")
+        };
+      }
+
+      available.aspect = {
+        action: "aspect",
+        icon: "assets/icons/ic_player_aspect_ratio.svg",
+        title: t("player_more_aspect_ratio", {}, "Aspect Ratio")
+      };
+
+      available.streamInfo = { action: "streamInfo", label: "ⓘ", title: t("cd_stream_info", {}, "Stream info") };
+
+      const { bar, more } = arrangePlayerControls(available, PlayerSettingsStore.get().playerControlLayout);
+      const playPause = {
+        action: "playPause",
+        label: paused ? ">" : "II",
+        icon: paused ? "assets/icons/ic_player_play.svg" : "assets/icons/ic_player_pause.svg",
+        title: "Play/Pause",
+        primary: true
+      };
+
+      if (!more.length) {
+        this.moreActionsVisible = false;
+        return [playPause, ...bar];
+      }
 
       if (!this.moreActionsVisible) {
-        return base;
+        return [
+          playPause,
+          ...bar,
+          {
+            action: "more",
+            label: ">",
+            title: t("player_more_actions_title", {}, "More Actions")
+          }
+        ];
       }
 
-      const playbackSpeed = this.getPlaybackSpeed();
-      const playbackSpeedOptions = this.getPlaybackSpeedOptions();
-      return [
-        ...base.slice(0, Math.max(0, base.length - 1)),
-        ...(playbackSpeedOptions.length > 1
-          ? [
-              {
-                action: "speed",
-                label: `${playbackSpeed.toFixed(playbackSpeed % 1 ? 2 : 0)}x`,
-                title: t("player_playback_speed", {}, "Playback speed")
-              }
-            ]
-          : []),
-        {
-          action: "aspect",
-          icon: "assets/icons/ic_player_aspect_ratio.svg",
-          title: t("player_more_aspect_ratio", {}, "Aspect Ratio")
-        },
-        { action: "streamInfo", label: "ⓘ", title: t("cd_stream_info", {}, "Stream info") },
-        { action: "backFromMore", label: "<", title: t("player_go_back", {}, "Back") }
-      ];
+      return [playPause, ...bar, ...more, { action: "backFromMore", label: "<", title: t("player_go_back", {}, "Back") }];
+    },
+    getFirstMoreControlAction() {
+      const layout = PlayerSettingsStore.get().playerControlLayout;
+      const barActions = new Set(layout.filter((entry) => entry.placement === "bar").map((entry) => entry.id));
+      const controls = this.getControlDefinitions();
+      return controls.find((entry) => !["playPause", "backFromMore", "more"].includes(entry.action) && !barActions.has(entry.action))
+        ?.action;
     },
     getControlRenderSignature(controls = this.getControlDefinitions()) {
       return JSON.stringify(

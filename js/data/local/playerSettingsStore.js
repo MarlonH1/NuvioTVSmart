@@ -9,6 +9,12 @@ import {
   SUBTITLE_TEXT_OPACITY_DEFAULT,
   normalizeSubtitleTextOpacity
 } from "../../core/player/subtitleTextOpacity.js";
+import {
+  DEFAULT_ANIME_PLAYBACK_SPEED,
+  DEFAULT_PLAYER_CONTROL_LAYOUT,
+  normalizeAnimePlaybackSpeed,
+  normalizePlayerControlLayout
+} from "../../core/player/playerCustomization.js";
 
 const KEY = "playerSettings";
 
@@ -41,6 +47,9 @@ const DEFAULTS = {
   stillWatchingEnabled: false,
   stillWatchingEpisodeThreshold: 3,
   osdClockEnabled: true,
+  playerControlLayout: DEFAULT_PLAYER_CONTROL_LAYOUT,
+  animePlaybackSpeedEnabled: false,
+  animePlaybackSpeed: DEFAULT_ANIME_PLAYBACK_SPEED,
   subtitleRenderMode: "native",
   subtitleStyle: {
     fontSize: 100,
@@ -357,6 +366,11 @@ export function normalizePlayerSettings(settings = {}) {
       settings.stillWatchingEpisodeThreshold ?? DEFAULTS.stillWatchingEpisodeThreshold
     ),
     osdClockEnabled: Boolean(persistentSettings.osdClockEnabled ?? DEFAULTS.osdClockEnabled),
+    playerControlLayout: normalizePlayerControlLayout(persistentSettings.playerControlLayout),
+    animePlaybackSpeedEnabled: Boolean(
+      persistentSettings.animePlaybackSpeedEnabled ?? DEFAULTS.animePlaybackSpeedEnabled
+    ),
+    animePlaybackSpeed: normalizeAnimePlaybackSpeed(persistentSettings.animePlaybackSpeed),
     subtitlesEnabled: true,
     secondaryPreferredAudioLanguage: (() => {
       const normalized = String(

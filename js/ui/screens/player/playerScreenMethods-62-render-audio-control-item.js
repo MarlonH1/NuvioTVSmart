@@ -1,9 +1,20 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
+import { isAnimeContent } from "../../../core/player/playerCustomization.js";
 
 export function createPlayerScreenMethods62() {
-  const { PlayerController, streamRepository, orderStreamsByAddonOrder, DebridStreamPresentation, isSelectKeyCode, t, clamp, escapeHtml } =
-    internals;
+  const {
+    PlayerController,
+    metaRepository,
+    streamRepository,
+    orderStreamsByAddonOrder,
+    DebridStreamPresentation,
+    isSelectKeyCode,
+    t,
+    clamp,
+    escapeHtml
+  } = internals;
 
   return {
     renderAudioControlItem(control, index) {
@@ -131,6 +142,35 @@ export function createPlayerScreenMethods62() {
       this.renderSpeedDialog();
       this.updateModalBackdrop();
       this.resetControlsAutoHide();
+    },
+    // Runs on each "playing" event; acts once per item so manual speed changes
+    // made during an episode are kept until the next one starts.
+    maybeApplyAnimePlaybackSpeed() {
+      const params = this.params || {};
+      const itemKey = [params.itemId, params.videoId, params.season, params.episode].join(":");
+      if (this.animePlaybackSpeedItemKey === itemKey) {
+        return;
+      }
+      this.animePlaybackSpeedItemKey = itemKey;
+      const settings = PlayerSettingsStore.get();
+      if (!settings.animePlaybackSpeedEnabled) {
+        return;
+      }
+      const meta = metaRepository.getCachedMeta?.(params.itemType, params.itemId) || null;
+      if (isAnimeContent({ itemId: params.itemId, itemType: params.itemType, meta })) {
+        PlayerController.animePlaybackSpeedActive = true;
+        if (Math.abs(this.getPlaybackSpeed() - settings.animePlaybackSpeed) > 0.01) {
+          void this.applyPlaybackSpeed(settings.animePlaybackSpeed);
+        }
+        return;
+      }
+      // Speed is kept on the shared controller, so drop a carried-over anime speed.
+      if (PlayerController.animePlaybackSpeedActive) {
+        PlayerController.animePlaybackSpeedActive = false;
+        if (Math.abs(this.getPlaybackSpeed() - 1) > 0.01) {
+          void this.applyPlaybackSpeed(1);
+        }
+      }
     },
     async applyPlaybackSpeed(speed = 1) {
       if (this.partyBlocksControl?.()) {

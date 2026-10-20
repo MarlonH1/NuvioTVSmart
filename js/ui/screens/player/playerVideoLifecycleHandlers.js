@@ -89,6 +89,7 @@ export function createPlayerVideoLifecycleHandlers(video, isTizenAvPlayPlayback)
       this.applySubtitlePresentationSettings();
       this.applyAspectMode({ showToast: false });
       this.attemptPendingPlaybackRestore();
+      this.maybeApplyAnimePlaybackSpeed();
       this.setLoadingLogoFillTarget(1);
       this.markPlaybackPresentedAfterAdvance();
       this.updateLoadingVisibility();
@@ -137,6 +138,7 @@ export function createPlayerVideoLifecycleHandlers(video, isTizenAvPlayPlayback)
     this.applySubtitlePresentationSettings();
     this.applyAspectMode({ showToast: false });
     this.attemptPendingPlaybackRestore();
+    this.maybeApplyAnimePlaybackSpeed();
     this.setLoadingLogoFillTarget(1);
     this.markPlaybackPresentedAfterAdvance();
     this.updateLoadingVisibility();

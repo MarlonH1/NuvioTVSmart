@@ -2,6 +2,7 @@
 import * as internals from "./settingsScreenContext.js";
 import { renderPlaybackGeneralBody } from "./settingsScreenPlaybackMarkup-01-general.js";
 import { renderPlaybackAudioBody } from "./settingsScreenPlaybackMarkup-02-audio.js";
+import { renderPlaybackControlsBody } from "./settingsScreenPlaybackMarkup-03-controls.js";
 import { renderPlaybackSubtitleBody } from "./settingsScreenPlaybackMarkup-04-subtitles.js";
 import { renderPlaybackP2pBody } from "./settingsScreenPlaybackMarkup-05-p2p.js";
 
@@ -15,6 +16,7 @@ export function renderPlaybackSectionMarkup(model) {
     : t("settings_p2p_subtitle");
   const generalBody = renderPlaybackGeneralBody.call(this, model);
   const audioBody = renderPlaybackAudioBody.call(this, model);
+  const controlsBody = renderPlaybackControlsBody.call(this, model);
   const subtitleBody = renderPlaybackSubtitleBody.call(this, model);
   const p2pBody = renderPlaybackP2pBody.call(this, model, {
     torrentSettings,
@@ -31,6 +33,13 @@ export function renderPlaybackSectionMarkup(model) {
                 subtitle: t("settings.playback.groups.general.subtitle"),
                 expanded: Boolean(expanded.general),
                 bodyHtml: generalBody
+              })}
+              ${this.renderCollapsibleRow({
+                focusKey: "playback:toggle:controls",
+                title: t("player_controls_title", {}, "Player controls"),
+                subtitle: t("player_controls_sub", {}, "Arrange the player bar and set anime playback speed."),
+                expanded: Boolean(expanded.controls),
+                bodyHtml: controlsBody
               })}
               ${this.renderCollapsibleRow({
                 focusKey: "playback:toggle:audio",
