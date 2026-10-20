@@ -2568,7 +2568,7 @@
     <string name="party_friend_invite_unknown_message">%1$s (nicht in deinen Freunden) lädt dich ein, %2$s zu schauen.</string>
     <string name="party_friend_none">Füge in Einstellungen &gt; Watch Party Freunde hinzu, um sie hier einzuladen.</string>
     <string name="personal_rating_title">Deine Bewertung</string>
-    <string name="personal_rating_hint">Hoch/Runter ändert die Bewertung in 0,5er-Schritten (0–10).</string>
+    <string name="personal_rating_hint">Links/Rechts ändert die Bewertung, OK speichert. Zifferntasten springen zu einer ganzen Zahl.</string>
     <string name="personal_rating_remove">Entfernen</string>
     <string name="personal_rating_rate">Bewerten</string>
     <string name="personal_rating_yours">Deine Bewertung %1$s</string>

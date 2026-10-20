@@ -3287,7 +3287,7 @@
     <string name="party_friend_invite_unknown_message">%1$s (not in your friends) invites you to watch %2$s.</string>
     <string name="party_friend_none">Add friends in Settings &gt; Watch party to invite them from here.</string>
     <string name="personal_rating_title">Your rating</string>
-    <string name="personal_rating_hint">Up/Down changes the rating in 0.5 steps (0–10).</string>
+    <string name="personal_rating_hint">Left/Right changes the rating, OK saves. Number keys jump to a whole number.</string>
     <string name="personal_rating_remove">Remove</string>
     <string name="personal_rating_rate">Rate</string>
     <string name="personal_rating_yours">Your rating %1$s</string>

@@ -367,96 +367,105 @@ export function createMetaDetailsScreenMethods26() {
       }
 
       if (action === "toggleWatched") {
-        const profileId = ProfileManager.getActiveProfileId();
-        const token = this.detailLoadToken;
-        const current = () => ProfileManager.getActiveProfileId() === profileId && this.detailLoadToken === token;
-        const focusRestore = this.captureDetailFocus();
-        const isSeries = isSeriesDetailMeta(this.meta, this.episodes);
-        if (isSeries) {
-          if (this.isMarkedWatched) {
+        // OK on a focused <button> also fires a click, which the pointer path
+        // replays as a second OK. Without this guard the second run reverts
+        // the first (watched -> unwatched); Library's toggle has the same guard.
+        if (this.watchedTogglePending) return;
+        this.watchedTogglePending = true;
+        try {
+          const profileId = ProfileManager.getActiveProfileId();
+          const token = this.detailLoadToken;
+          const current = () => ProfileManager.getActiveProfileId() === profileId && this.detailLoadToken === token;
+          const focusRestore = this.captureDetailFocus();
+          const isSeries = isSeriesDetailMeta(this.meta, this.episodes);
+          if (isSeries) {
+            if (this.isMarkedWatched) {
+              if (
+                (await watchedSeriesReconciliationService.unmarkSeriesWatched(this.params?.itemId, {
+                  meta: this.meta
+                })) === false
+              ) {
+                if (current()) {
+                  await this.refreshEpisodePlaybackState();
+                  if (current()) this.render(this.meta, focusRestore);
+                }
+                return false;
+              }
+              if (!current()) return false;
+            } else {
+              const marked = await watchedSeriesReconciliationService.markSeriesWatched(
+                this.params?.itemId,
+                this.params?.itemType || this.meta?.type || "series",
+                {
+                  meta: this.meta,
+                  title: this.meta?.name || this.params?.fallbackTitle || "Untitled"
+                }
+              );
+              if (!marked) {
+                if (current()) {
+                  await this.refreshEpisodePlaybackState();
+                  if (current()) this.render(this.meta, focusRestore);
+                }
+                return false;
+              }
+            }
+          } else if (this.isMarkedWatched) {
+            const providerIds = {
+              imdbId: resolveMetaImdbId(this.meta, this.params),
+              tmdbId: resolveMetaTmdbId(this.meta, this.params),
+              traktId: resolveMetaTraktId(this.meta, this.params)
+            };
             if (
-              (await watchedSeriesReconciliationService.unmarkSeriesWatched(this.params?.itemId, {
-                meta: this.meta
-              })) === false
-            ) {
-              if (current()) {
-                await this.refreshEpisodePlaybackState();
-                if (current()) this.render(this.meta, focusRestore);
-              }
-              return false;
-            }
-            if (!current()) return false;
-          } else {
-            const marked = await watchedSeriesReconciliationService.markSeriesWatched(
-              this.params?.itemId,
-              this.params?.itemType || this.meta?.type || "series",
-              {
-                meta: this.meta,
+              (await watchedItemsRepository.unmark(this.params?.itemId, {
+                ...providerIds,
+                contentType: this.params?.itemType || "movie",
                 title: this.meta?.name || this.params?.fallbackTitle || "Untitled"
-              }
-            );
-            if (!marked) {
-              if (current()) {
-                await this.refreshEpisodePlaybackState();
-                if (current()) this.render(this.meta, focusRestore);
-              }
+              })) === false ||
+              !current()
+            )
               return false;
-            }
-          }
-        } else if (this.isMarkedWatched) {
-          const providerIds = {
-            imdbId: resolveMetaImdbId(this.meta, this.params),
-            tmdbId: resolveMetaTmdbId(this.meta, this.params),
-            traktId: resolveMetaTraktId(this.meta, this.params)
-          };
-          if (
-            (await watchedItemsRepository.unmark(this.params?.itemId, {
-              ...providerIds,
-              contentType: this.params?.itemType || "movie",
-              title: this.meta?.name || this.params?.fallbackTitle || "Untitled"
-            })) === false ||
-            !current()
-          )
-            return false;
-          await watchProgressRepository.removeProgress(this.params?.itemId);
-        } else {
-          const providerIds = {
-            imdbId: resolveMetaImdbId(this.meta, this.params),
-            tmdbId: resolveMetaTmdbId(this.meta, this.params),
-            traktId: resolveMetaTraktId(this.meta, this.params)
-          };
-          if (
-            (await watchedItemsRepository.mark({
+            await watchProgressRepository.removeProgress(this.params?.itemId);
+          } else {
+            const providerIds = {
+              imdbId: resolveMetaImdbId(this.meta, this.params),
+              tmdbId: resolveMetaTmdbId(this.meta, this.params),
+              traktId: resolveMetaTraktId(this.meta, this.params)
+            };
+            if (
+              (await watchedItemsRepository.mark({
+                contentId: this.params?.itemId,
+                ...providerIds,
+                contentType: this.params?.itemType || "movie",
+                title: this.meta?.name || this.params?.fallbackTitle || "Untitled",
+                watchedAt: Date.now()
+              })) === false ||
+              !current()
+            )
+              return false;
+            await watchProgressRepository.saveProgress({
               contentId: this.params?.itemId,
               ...providerIds,
               contentType: this.params?.itemType || "movie",
-              title: this.meta?.name || this.params?.fallbackTitle || "Untitled",
-              watchedAt: Date.now()
-            })) === false ||
-            !current()
-          )
-            return false;
-          await watchProgressRepository.saveProgress({
-            contentId: this.params?.itemId,
-            ...providerIds,
-            contentType: this.params?.itemType || "movie",
-            videoId: null,
-            positionMs: 100,
-            durationMs: 100,
-            updatedAt: Date.now()
-          });
+              videoId: null,
+              positionMs: 100,
+              durationMs: 100,
+              updatedAt: Date.now()
+            });
+          }
+          if (!current()) return false;
+          if (!isSeries && this.meta?.ids?.trakt) {
+            const enriched = await detailWatchedEnrichmentService.enrichMovieWatchedState(this.params?.itemId, this.meta.ids.trakt);
+            this.enrichedMovieState = enriched;
+            this.isMarkedWatched = Boolean(enriched?.isWatched);
+          }
+          if (!current()) return false;
+          await this.refreshEpisodePlaybackState();
+          if (!current()) return false;
+          this.render(this.meta, focusRestore);
+          return;
+        } finally {
+          this.watchedTogglePending = false;
         }
-        if (!current()) return false;
-        if (!isSeries && this.meta?.ids?.trakt) {
-          const enriched = await detailWatchedEnrichmentService.enrichMovieWatchedState(this.params?.itemId, this.meta.ids.trakt);
-          this.enrichedMovieState = enriched;
-          this.isMarkedWatched = Boolean(enriched?.isWatched);
-        }
-        if (!current()) return false;
-        await this.refreshEpisodePlaybackState();
-        if (!current()) return false;
-        this.render(this.meta, focusRestore);
-        return;
       }
 
       if (action === "playStream" && current.dataset.streamUrl) {
