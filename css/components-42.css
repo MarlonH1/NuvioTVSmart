@@ -409,6 +409,12 @@
   white-space: nowrap;
 }
 
+.series-episode-meta .series-episode-personal-rating {
+  color: #f5c518;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .series-episode-meta .series-imdb-badge {
   height: auto;
   padding: 0;

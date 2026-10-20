@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
+import { PersonalRatingsStore, formatPersonalRating } from "../../../data/local/personalRatingsStore.js";
 
 export function createMetaDetailsScreenMethods12() {
   const { libraryRepository, NuvioDialog, isWatchProgressInProgress, t, resolveMetaImdbId, resolveMetaTmdbId, resolveMetaTraktId } =
@@ -31,6 +32,18 @@ export function createMetaDetailsScreenMethods12() {
           label: t("episodes_mark_previous_watched", {}, "Mark previous episodes as watched")
         });
       }
+      const personalRating = PersonalRatingsStore.get(this.getEpisodePersonalRatingKey(episode));
+      options.push({
+        action: "ratePersonal",
+        label:
+          personalRating == null
+            ? t("personal_rating_rate_episode", {}, "Rate episode")
+            : t(
+                "personal_rating_change_episode",
+                [formatPersonalRating(personalRating)],
+                `Change rating (${formatPersonalRating(personalRating)})`
+              )
+      });
       const progress = this.getEpisodeMenuProgress(episode);
       options.push({
         action: "play",

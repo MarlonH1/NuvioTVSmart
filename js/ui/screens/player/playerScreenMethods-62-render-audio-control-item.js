@@ -2,6 +2,8 @@
 import * as internals from "./playerScreenContext.js";
 import { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
 import { isAnimeContent } from "../../../core/player/playerCustomization.js";
+import { PersonalRatingsStore, personalRatingKey } from "../../../data/local/personalRatingsStore.js";
+import { showPersonalRatingDialog } from "../../components/personalRatingDialog.js";
 
 export function createPlayerScreenMethods62() {
   const {
@@ -184,6 +186,28 @@ export function createPlayerScreenMethods62() {
           void this.applyPlaybackSpeed(1);
         }
       }
+    },
+    // Episodes use their video id, matching the detail screen's episode ratings.
+    getPersonalRatingKey() {
+      const params = this.params || {};
+      const isEpisode = params.season != null && params.episode != null && Boolean(params.videoId);
+      return personalRatingKey({ itemId: params.itemId, videoId: params.videoId, episode: isEpisode });
+    },
+    openPersonalRatingDialog() {
+      const key = this.getPersonalRatingKey();
+      if (!key) return;
+      const params = this.params || {};
+      const title = [params.playerTitle || params.itemTitle || "", params.playerSubtitle || ""].filter(Boolean).join(" · ");
+      this.clearControlsAutoHide?.();
+      showPersonalRatingDialog({
+        title,
+        rating: PersonalRatingsStore.get(key),
+        onSave: (rating) => {
+          PersonalRatingsStore.set(key, rating, { title });
+          this.renderControlButtons();
+          this.resetControlsAutoHide();
+        }
+      });
     },
     async applyPlaybackSpeed(speed = 1) {
       if (this.partyBlocksControl?.()) {

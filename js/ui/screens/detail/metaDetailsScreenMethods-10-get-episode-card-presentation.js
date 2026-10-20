@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
+import { PersonalRatingsStore, formatPersonalRating } from "../../../data/local/personalRatingsStore.js";
 
 export function createMetaDetailsScreenMethods10() {
   const {
@@ -32,11 +33,15 @@ export function createMetaDetailsScreenMethods10() {
       const rating = showEpisodeImdbRating(layoutPreferences.detailImdbRatingsVisibility, isWatched)
         ? resolveEpisodeImdbRating(episode, this.seriesRatingsBySeason)
         : null;
+      const personalRating = PersonalRatingsStore.get(this.getEpisodePersonalRatingKey(episode));
       const dateLabel = formatEpisodeCardDate(episode.released || "");
       const isUnavailable = episode.available === false;
       const metaParts = [
         episode.runtimeMinutes > 0 ? renderEpisodeRuntimeLabel(episode.runtimeMinutes) : "",
         rating != null ? `<span class="series-episode-rating-inline">${renderImdbBadge(String(Number(rating).toFixed(1)))}</span>` : "",
+        personalRating != null
+          ? `<span class="series-episode-personal-rating">★ ${escapeHtml(formatPersonalRating(personalRating))}</span>`
+          : "",
         dateLabel ? `<span class="series-episode-date">${escapeHtml(dateLabel)}</span>` : ""
       ]
         .filter(Boolean)

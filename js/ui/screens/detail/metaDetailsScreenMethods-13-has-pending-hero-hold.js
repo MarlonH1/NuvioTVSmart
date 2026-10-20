@@ -1,4 +1,7 @@
 import { detailShuffleSettings, openDetailShuffle } from "./detailEpisodeShuffle.js";
+import { PersonalRatingsStore, personalRatingKey } from "../../../data/local/personalRatingsStore.js";
+import { showPersonalRatingDialog } from "../../components/personalRatingDialog.js";
+import { personalRatingButtonLabel, personalRatingButtonMarkup } from "./personalRatingButton.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
 
@@ -173,6 +176,46 @@ export function createMetaDetailsScreenMethods13() {
         return;
       }
       await this.openMovieStreamChooser({ startOver, manualSelection });
+    },
+    getPersonalRatingTitleKey() {
+      return personalRatingKey({ itemId: this.params?.itemId || this.meta?.id || "" });
+    },
+    openPersonalRatingFromHero() {
+      const key = this.getPersonalRatingTitleKey();
+      const title = this.meta?.name || "";
+      showPersonalRatingDialog({
+        title,
+        rating: PersonalRatingsStore.get(key),
+        onSave: (rating) => {
+          PersonalRatingsStore.set(key, rating, { title });
+          this.syncPersonalRatingButton();
+        }
+      });
+    },
+    syncPersonalRatingButton() {
+      const button = this.container?.querySelector?.(".series-detail-actions [data-action='ratePersonal']");
+      if (!button) return;
+      const rating = PersonalRatingsStore.get(this.getPersonalRatingTitleKey());
+      button.classList.toggle("is-selected", rating != null);
+      button.setAttribute("aria-label", personalRatingButtonLabel(rating));
+      button.innerHTML = personalRatingButtonMarkup(rating);
+    },
+    getEpisodePersonalRatingKey(episode) {
+      return personalRatingKey({ videoId: episode?.id || "", episode: true });
+    },
+    openEpisodePersonalRating(episode) {
+      const key = this.getEpisodePersonalRatingKey(episode);
+      if (!key) return false;
+      const title = `${this.meta?.name || ""} S${Number(episode.season || 0)}E${Number(episode.episode || 0)}`.trim();
+      showPersonalRatingDialog({
+        title,
+        rating: PersonalRatingsStore.get(key),
+        onSave: (rating) => {
+          PersonalRatingsStore.set(key, rating, { title });
+          this.render(this.meta, this.captureDetailFocus());
+        }
+      });
+      return true;
     },
     async toggleLibraryFromHero() {
       if (this.libraryTogglePending) {

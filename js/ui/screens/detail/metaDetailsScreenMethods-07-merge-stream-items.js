@@ -1,5 +1,7 @@
 import { hasWatchProgressStarted, isWatchProgressCompleted } from "../../../domain/model/watchProgress.js";
 import { detailShuffleSettings } from "./detailEpisodeShuffle.js";
+import { PersonalRatingsStore } from "../../../data/local/personalRatingsStore.js";
+import { personalRatingButtonLabel, personalRatingButtonMarkup } from "./personalRatingButton.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
 
@@ -248,6 +250,10 @@ export function createMetaDetailsScreenMethods07() {
                   ${renderLibraryGlyph(this.isSavedInLibrary)}
                 </button>
                 ${showWatchedButton ? `<button class="series-circle-btn focusable${this.isMarkedWatched ? " is-selected" : ""}" data-action="toggleWatched" aria-label="${escapeAttribute(this.isMarkedWatched ? t("common.markUnwatched", {}, "Mark Unwatched") : t("common.markWatched", {}, "Mark Watched"))}">${renderWatchedGlyph(this.isMarkedWatched)}</button>` : ""}
+                ${(() => {
+                  const personalRating = PersonalRatingsStore.get(this.getPersonalRatingTitleKey());
+                  return `<button class="series-circle-btn focusable${personalRating != null ? " is-selected" : ""}" data-action="ratePersonal" aria-label="${escapeAttribute(personalRatingButtonLabel(personalRating))}">${personalRatingButtonMarkup(personalRating)}</button>`;
+                })()}
                 ${trailerButton}
               </div>
               ${this.renderResumeIndicator()}

@@ -154,6 +154,10 @@ export function createMetaDetailsScreenMethods15() {
         this.closeEpisodeHoldMenu({ restoreFocus: false });
         return this.markPreviousEpisodesWatched(episode);
       }
+      if (option.action === "ratePersonal") {
+        this.closeEpisodeHoldMenu({ restoreFocus: true });
+        return this.openEpisodePersonalRating(episode);
+      }
       return false;
     },
     async activateSeasonHoldMenuOption() {

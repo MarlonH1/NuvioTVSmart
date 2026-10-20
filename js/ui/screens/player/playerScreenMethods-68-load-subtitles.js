@@ -251,6 +251,11 @@ export function createPlayerScreenMethods68() {
         return;
       }
 
+      if (action === "rate") {
+        this.openPersonalRatingDialog();
+        return;
+      }
+
       if (action === "aspect") {
         this.cycleAspectMode();
         return;

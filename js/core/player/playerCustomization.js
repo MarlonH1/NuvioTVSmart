@@ -13,7 +13,8 @@ export const DEFAULT_PLAYER_CONTROL_LAYOUT = [
   { id: "party", placement: "bar" },
   { id: "speed", placement: "more" },
   { id: "aspect", placement: "more" },
-  { id: "streamInfo", placement: "more" }
+  { id: "streamInfo", placement: "more" },
+  { id: "rate", placement: "more" }
 ];
 
 const CONTROL_IDS = DEFAULT_PLAYER_CONTROL_LAYOUT.map((entry) => entry.id);

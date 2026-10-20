@@ -373,6 +373,16 @@
   justify-content: center;
 }
 
+.series-circle-btn .detail-personal-rating-icon {
+  font-size: 36px;
+}
+
+.series-circle-btn .detail-personal-rating-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
 .series-primary-btn.focused,
 .series-circle-btn.focused {
   transform: none;

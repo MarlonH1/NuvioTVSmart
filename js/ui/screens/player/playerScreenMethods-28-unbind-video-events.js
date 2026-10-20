@@ -4,6 +4,7 @@ import * as internals from "./playerScreenContext.js";
 import { PartyRepository } from "../../../core/party/partyRepository.js";
 import { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
 import { arrangePlayerControls } from "../../../core/player/playerCustomization.js";
+import { PersonalRatingsStore, formatPersonalRating } from "../../../data/local/personalRatingsStore.js";
 
 export function createPlayerScreenMethods28() {
   const { PlayerController, t, clamp, escapeHtml } = internals;
@@ -91,6 +92,13 @@ export function createPlayerScreenMethods28() {
         action: "aspect",
         icon: "assets/icons/ic_player_aspect_ratio.svg",
         title: t("player_more_aspect_ratio", {}, "Aspect Ratio")
+      };
+
+      const personalRating = PersonalRatingsStore.get(this.getPersonalRatingKey());
+      available.rate = {
+        action: "rate",
+        label: personalRating == null ? "☆" : `★ ${formatPersonalRating(personalRating)}`,
+        title: t("personal_rating_rate", [], "Rate")
       };
 
       available.streamInfo = { action: "streamInfo", label: "ⓘ", title: t("cd_stream_info", {}, "Stream info") };

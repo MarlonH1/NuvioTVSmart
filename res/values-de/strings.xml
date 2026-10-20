@@ -2567,6 +2567,13 @@
     <string name="party_friend_invite_message">%1$s lädt dich ein, %2$s zu schauen.</string>
     <string name="party_friend_invite_unknown_message">%1$s (nicht in deinen Freunden) lädt dich ein, %2$s zu schauen.</string>
     <string name="party_friend_none">Füge in Einstellungen &gt; Watch Party Freunde hinzu, um sie hier einzuladen.</string>
+    <string name="personal_rating_title">Deine Bewertung</string>
+    <string name="personal_rating_hint">Hoch/Runter ändert die Bewertung in 0,5er-Schritten (0–10).</string>
+    <string name="personal_rating_remove">Entfernen</string>
+    <string name="personal_rating_rate">Bewerten</string>
+    <string name="personal_rating_yours">Deine Bewertung %1$s</string>
+    <string name="personal_rating_rate_episode">Folge bewerten</string>
+    <string name="personal_rating_change_episode">Bewertung ändern (%1$s)</string>
     <string name="nuvio_remote_title">Handy-Fernbedienung</string>
     <string name="nuvio_remote_settings_description">Nuvio auf diesem Fernseher mit dem Handy steuern</string>
     <string name="nuvio_remote_toggle_title">Handy als Fernbedienung erlauben</string>

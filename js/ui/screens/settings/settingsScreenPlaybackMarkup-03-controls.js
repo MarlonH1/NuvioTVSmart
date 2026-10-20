@@ -11,7 +11,8 @@ export const PLAYER_CONTROL_LABELS = {
   party: ["party_title", "Watch party"],
   speed: ["player_playback_speed", "Playback speed"],
   aspect: ["player_more_aspect_ratio", "Aspect Ratio"],
-  streamInfo: ["cd_stream_info", "Stream info"]
+  streamInfo: ["cd_stream_info", "Stream info"],
+  rate: ["personal_rating_rate", "Rate"]
 };
 
 export function playerControlLabel(t, id) {

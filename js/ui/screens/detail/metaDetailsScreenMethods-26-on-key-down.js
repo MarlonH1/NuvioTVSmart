@@ -361,6 +361,11 @@ export function createMetaDetailsScreenMethods26() {
         return;
       }
 
+      if (action === "ratePersonal") {
+        this.openPersonalRatingFromHero();
+        return;
+      }
+
       if (action === "toggleWatched") {
         const profileId = ProfileManager.getActiveProfileId();
         const token = this.detailLoadToken;
