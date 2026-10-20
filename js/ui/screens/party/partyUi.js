@@ -2,6 +2,7 @@
 // PartyCode.kt and PartyDetails.kt.
 import { I18n } from "../../../i18n/index.js";
 import { NuvioDialog } from "../../components/nuvioDialog.js";
+import { PartyFriends } from "../../../core/party/partyFriends.js";
 import {
   PARTY_CODE_LENGTH,
   PartyError,
@@ -389,6 +390,31 @@ export function showConfirmDialog({ title, message, confirmLabel, onConfirm, onD
 export async function showInviteDialog(party, { onDismiss = null } = {}) {
   const { QrCodeGenerator } = await import("../../../core/qr/qrCodeGenerator.js");
   let dialog = null;
+  let status = null;
+  const setStatus = (text) => {
+    if (status) status.textContent = text;
+  };
+  const friendButtons = PartyFriends.list().map((friend) => ({
+    key: `friend:${friend.code}`,
+    label: t("party_friend_send", [friend.name], `Invite ${friend.name}`),
+    onAction: async () => {
+      setStatus(t("party_friend_sending", [friend.name], `Sending invite to ${friend.name}…`));
+      const sent = await PartyFriends.sendInvite(friend, {
+        partyCode: party.code,
+        title: displayTitle(party.media),
+        fromName: partyMember(party, party.memberId)?.display_name || ""
+      });
+      setStatus(
+        sent
+          ? t("party_friend_sent", [friend.name], `Invite sent to ${friend.name}`)
+          : t(
+              "party_friend_send_failed",
+              [friend.name],
+              `Couldn't reach ${friend.name}. Try again.`
+            )
+      );
+    }
+  }));
   dialog = new NuvioDialog({
     title: t("party_open_seat"),
     widthVw: 66.7,
@@ -412,12 +438,16 @@ export async function showInviteDialog(party, { onDismiss = null } = {}) {
       copy.innerHTML = `
         <div class="party-invite-scan">${escapeHtml(t("party_invite_scan"))}</div>
         ${codeSlotsMarkup(party.code, { size: "lg" })}
-        <div class="party-invite-share">${escapeHtml(t("party_invite_share"))}</div>`;
+        <div class="party-invite-share">${escapeHtml(t("party_invite_share"))}</div>
+        <div class="party-invite-friend-status" role="status" aria-live="polite"></div>`;
+      status = copy.querySelector(".party-invite-friend-status");
       wrap.appendChild(canvas);
       wrap.appendChild(copy);
       return wrap;
     },
+    actionsClassName: friendButtons.length ? "party-invite-friend-actions" : "",
     buttons: [
+      ...friendButtons,
       {
         key: "close",
         label: t("action_close", [], "Close"),

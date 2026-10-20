@@ -874,6 +874,16 @@
   font-size: 24px;
   line-height: 1.35;
 }
+.party-invite-friend-status {
+  min-height: 32px;
+  color: #fff;
+  font-size: 24px;
+}
+.nuvio-dialog-actions.party-invite-friend-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
 
 @keyframes party-pulse {
   0% {

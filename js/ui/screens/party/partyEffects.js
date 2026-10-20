@@ -2,7 +2,9 @@
 // an availability refresh whenever the app comes to the foreground.
 import { PartyRepository } from "../../../core/party/partyRepository.js";
 import { PartyEventType } from "../../../core/party/partyModels.js";
-import { t } from "./partyUi.js";
+import { PartyFriends } from "../../../core/party/partyFriends.js";
+import { Router } from "../../navigation/routerState.js";
+import { showConfirmDialog, t } from "./partyUi.js";
 
 const TOAST_DURATION_MS = 2000;
 let installed = false;
@@ -45,10 +47,33 @@ export function partyEventMessage(event) {
   }
 }
 
+function showFriendInvite(invite, repository) {
+  if (repository.getState().party?.code === invite.partyCode) return;
+  const sender = invite.senderName || t("party_friend_unknown", [], "Someone");
+  const title = invite.title || t("party_title");
+  showConfirmDialog({
+    title: t("party_friend_invite_title", [], "Watch party invite"),
+    message: invite.knownFriend
+      ? t(
+          "party_friend_invite_message",
+          [sender, title],
+          `${sender} invites you to watch ${title}.`
+        )
+      : t(
+          "party_friend_invite_unknown_message",
+          [sender, title],
+          `${sender} (not in your friends) invites you to watch ${title}.`
+        ),
+    confirmLabel: t("party_join_action"),
+    onConfirm: () => Router.navigate("watchParty", { code: invite.partyCode })
+  });
+}
+
 export function installPartyEffects(repository = PartyRepository) {
   if (installed) return;
   installed = true;
   repository.subscribeEvents((event) => showPartyToast(partyEventMessage(event)));
+  PartyFriends.listen((invite) => showFriendInvite(invite, repository));
   void repository.refreshAvailability();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") void repository.refreshAvailability();
