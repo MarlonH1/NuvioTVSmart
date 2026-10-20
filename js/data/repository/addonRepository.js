@@ -1,5 +1,6 @@
 import { MediaServerRepository } from "../mediaserver/mediaServerRepository.js";
 import { safeApiCall } from "../../core/network/safeApiCall.js";
+import { NetworkResult } from "../../core/network/networkResult.js";
 import { LocalStore } from "../../core/storage/localStore.js";
 import { ProfileManager } from "../../core/profile/profileManager.js";
 import { AddonApi } from "../remote/api/addonApi.js";
@@ -543,9 +544,16 @@ class AddonRepository {
     }
 
     const request = (async () => {
-      const result = await safeApiCall(() =>
+      const response = await safeApiCall(() =>
         AddonApi.getManifest(manifestUrl, timeoutMs === undefined ? {} : { timeoutMs })
       );
+      // A server can answer 200 with `null` or another non-object body. Treat
+      // that as a failed fetch: mapping it would throw and, since addons load
+      // together, break every detail screen.
+      const result =
+        response.status === "success" && (!response.data || typeof response.data !== "object")
+          ? NetworkResult.error("Invalid addon manifest")
+          : response;
       if (result.status === "success") {
         const addon = this.mapManifest(result.data, cleanBaseUrl);
         this.setManifestCacheEntry(cleanBaseUrl, addon);
