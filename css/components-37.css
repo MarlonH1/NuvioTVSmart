@@ -468,6 +468,6 @@
 .player-episode-thumb.is-blurred,
 .player-next-episode-thumb.is-blurred,
 .player-still-watching-thumb.is-blurred {
-  filter: blur(12px);
+  filter: blur(var(--episode-blur-strength, 12px));
   transform: scale(1.08);
 }

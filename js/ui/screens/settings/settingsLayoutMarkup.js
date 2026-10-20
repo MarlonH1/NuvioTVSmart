@@ -2,6 +2,19 @@ import { renderCustomPosterSettings } from "./settingsCustomPosterSection.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./settingsScreenContext.js";
 
+const EPISODE_BLUR_STRENGTH_LABELS = {
+  4: ["layout_blur_strength_subtle", "Subtle"],
+  8: ["layout_blur_strength_light", "Light"],
+  12: ["layout_blur_strength_medium", "Medium"],
+  20: ["layout_blur_strength_strong", "Strong"],
+  32: ["layout_blur_strength_max", "Maximum"]
+};
+
+export function episodeBlurStrengthLabel(t, strength) {
+  const [key, fallback] = EPISODE_BLUR_STRENGTH_LABELS[strength] || EPISODE_BLUR_STRENGTH_LABELS[12];
+  return t(key, {}, fallback);
+}
+
 export function renderLayoutMarkup(model) {
   const { isModernSidebarBlurAvailable, HOME_LAYOUT_OPTIONS, SECTION_META, t } = internals;
   const expanded = this.expandedSections.layout;
@@ -261,6 +274,16 @@ export function renderLayoutMarkup(model) {
               subtitle: t("settings.layout.blurUnwatched.subtitle"),
               checked: Boolean(model.layout.blurUnwatchedEpisodes)
             })}
+            ${
+              model.layout.blurUnwatchedEpisodes
+                ? this.renderActionRow({
+                    focusKey: "layout:detail:blurStrength",
+                    title: t("layout_blur_strength", {}, "Blur Strength"),
+                    subtitle: t("layout_blur_strength_sub", {}, "How strongly unwatched episode thumbnails are blurred."),
+                    value: episodeBlurStrengthLabel(t, model.layout.episodeBlurStrength)
+                  })
+                : ""
+            }
             ${this.renderActionRow({
               focusKey: "layout:detail:episodeRatings",
               title: t("layout_episode_ratings", {}, "Episode Ratings"),

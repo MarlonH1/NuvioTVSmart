@@ -5,6 +5,7 @@ import { syncBrandWordmarks } from "../components/brandWordmark.js";
 import { resolveThemeName } from "./themeAccess.js";
 import { ThemeColors } from "./themeColors.js";
 import { resolveCustomThemeColors } from "../../core/util/customThemeColors.js";
+import { applyEpisodeBlurStrength } from "./episodeBlurStrength.js";
 
 const FONT_STACKS = {
   INTER: '"Inter", "Segoe UI", Arial, sans-serif',
@@ -170,6 +171,7 @@ function injectLegacyTheme(css) {
 export const ThemeManager = {
   apply({ enforceAccess = false, access = null } = {}) {
     ensureMemberAccessSubscription();
+    applyEpisodeBlurStrength();
     const storedTheme = ThemeStore.get();
     const currentAccess = access || MemberAccessRepository.getCurrentAccess();
     const themeName = enforceAccess

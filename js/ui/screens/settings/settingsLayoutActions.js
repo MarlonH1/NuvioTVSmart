@@ -1,5 +1,8 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./settingsScreenContext.js";
+import { EPISODE_BLUR_STRENGTH_OPTIONS } from "../../../data/local/layoutPreferences.js";
+import { applyEpisodeBlurStrength } from "../../theme/episodeBlurStrength.js";
+import { episodeBlurStrengthLabel } from "./settingsLayoutMarkup.js";
 
 export function registerLayoutActions(model) {
   const { HomeCatalogStore, LayoutPreferences, HOME_LAYOUT_OPTIONS, t } = internals;
@@ -264,6 +267,21 @@ export function registerLayoutActions(model) {
   this.actionMap.set("layout:detail:blurUnwatched", () => {
     LayoutPreferences.set({
       blurUnwatchedEpisodes: !LayoutPreferences.get().blurUnwatchedEpisodes
+    });
+  });
+  this.actionMap.set("layout:detail:blurStrength", () => {
+    this.openOptionDialog({
+      title: t("layout_blur_strength", {}, "Blur Strength"),
+      options: EPISODE_BLUR_STRENGTH_OPTIONS.map((strength) => ({
+        id: strength,
+        label: episodeBlurStrengthLabel(t, strength)
+      })),
+      selectedId: LayoutPreferences.get().episodeBlurStrength,
+      returnFocusKey: "layout:detail:blurStrength",
+      onSelect: (option) => {
+        LayoutPreferences.set({ episodeBlurStrength: Number(option.id) });
+        applyEpisodeBlurStrength(Number(option.id));
+      }
     });
   });
   this.actionMap.set("layout:detail:episodeRatings", () => {

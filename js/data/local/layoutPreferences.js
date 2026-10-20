@@ -50,6 +50,7 @@ const DEFAULTS = {
   detailPageTrailerButtonEnabled: true,
   preferExternalMetaAddonDetail: true,
   blurUnwatchedEpisodes: false,
+  episodeBlurStrength: 12,
   randomEpisodeEnabled: false,
   collapseSidebar: false,
   modernSidebar: false,
@@ -65,6 +66,14 @@ const DEFAULTS = {
   homeImdbRatingsVisibility: "SHOW_ALL",
   detailImdbRatingsVisibility: "SHOW_ALL"
 };
+
+// Pixels of blur for protected episode artwork; 12 matches the original look.
+export const EPISODE_BLUR_STRENGTH_OPTIONS = [4, 8, 12, 20, 32];
+
+function normalizeEpisodeBlurStrength(value) {
+  const strength = Number(value);
+  return EPISODE_BLUR_STRENGTH_OPTIONS.includes(strength) ? strength : DEFAULTS.episodeBlurStrength;
+}
 
 function normalizeContinueWatchingSortMode(value) {
   const normalized = String(value || "default")
@@ -161,6 +170,7 @@ function normalizeLayoutPreferences(value = {}) {
     showFullReleaseDate: merged.showFullReleaseDate !== false,
     detailPageTrailerButtonEnabled: Boolean(merged.detailPageTrailerButtonEnabled),
     blurUnwatchedEpisodes: Boolean(merged.blurUnwatchedEpisodes),
+    episodeBlurStrength: normalizeEpisodeBlurStrength(merged.episodeBlurStrength),
     randomEpisodeEnabled: Boolean(merged.randomEpisodeEnabled),
     useEpisodeThumbnailsInCw: merged.useEpisodeThumbnailsInCw !== false,
     blurContinueWatchingNextUp: Boolean(merged.blurContinueWatchingNextUp),

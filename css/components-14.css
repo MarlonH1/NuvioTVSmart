@@ -384,7 +384,7 @@
 }
 
 .home-screen-shell .home-continue-card-blur-next-up .home-continue-bg {
-  filter: blur(12px);
+  filter: blur(var(--episode-blur-strength, 12px));
   transform: scale(1.08);
 }
 

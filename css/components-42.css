@@ -287,7 +287,7 @@
 }
 
 .series-episode-image.is-blurred {
-  filter: blur(12px);
+  filter: blur(var(--episode-blur-strength, 12px));
   transform: scale(1.08);
 }
 
