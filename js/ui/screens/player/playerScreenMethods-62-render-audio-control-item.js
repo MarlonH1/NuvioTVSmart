@@ -163,7 +163,21 @@ export function createPlayerScreenMethods62() {
       if (!settings.animePlaybackSpeedEnabled) {
         return;
       }
-      const meta = metaRepository.getCachedMeta?.(params.itemType, params.itemId) || null;
+      const cachedMeta = metaRepository.getCachedMeta?.(params.itemType, params.itemId) || null;
+      const remoteMeta = params.remoteMeta?.genres?.length ? params.remoteMeta : null;
+      if (!cachedMeta && !remoteMeta && params.itemId && this.animeMetaFetchItemId !== params.itemId) {
+        // Nothing to decide with (e.g. started from the phone remote): fetch the
+        // meta once, then decide again on a later tick once it is cached.
+        this.animeMetaFetchItemId = params.itemId;
+        this.animePlaybackSpeedItemKey = "";
+        void Promise.resolve(metaRepository.getMetaFromAllAddons?.(params.itemType, params.itemId))
+          .catch(() => null)
+          .finally(() => {
+            this.animePlaybackSpeedItemKey = "";
+          });
+        return;
+      }
+      const meta = cachedMeta || remoteMeta;
       if (isAnimeContent({ itemId: params.itemId, itemType: params.itemType, meta })) {
         PlayerController.animePlaybackSpeedActive = true;
         // Always send it: the controller can still report the previous

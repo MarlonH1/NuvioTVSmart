@@ -251,7 +251,14 @@ test("play while Nuvio is closed launches it and delivers the request once the a
   try {
     const { phone } = await pairPhone(env);
     const request = {
-      media: { type: "series", title: "Game of Thrones", season: 1, episode: 9 },
+      media: {
+        type: "series",
+        title: "Game of Thrones",
+        season: 1,
+        episode: 9,
+        genres: ["Drama"],
+        country: "United States"
+      },
       stream: { url: "https://example.com/v.mkv" },
       startPositionMs: 1000
     };
@@ -283,6 +290,11 @@ test("play while Nuvio is closed launches it and delivers the request once the a
     const cmd = await app.next("cmd");
     assert.strictEqual(cmd.action, "seek");
     assert.strictEqual(cmd.positionMs, 120000);
+
+    phone.send({ type: "cmd", action: "speed", rate: 1.5 });
+    const speed = await app.next("cmd");
+    assert.strictEqual(speed.action, "speed");
+    assert.strictEqual(speed.rate, 1.5);
 
     app.close();
     await phone.next("state", (m) => m.playback.status === "idle");

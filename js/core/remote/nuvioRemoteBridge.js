@@ -252,6 +252,13 @@ export function buildRemotePlayerParams(request) {
       Number.isFinite(Number(media.episode)) && media.episode != null
         ? Number(media.episode)
         : null,
+    // Metadata from the phone: the TV may never have opened this title's detail
+    // page, so its own meta cache can be empty (anime speed needs genres).
+    remoteMeta: {
+      genres: Array.isArray(media.genres) ? media.genres.map(String).slice(0, 20) : [],
+      country: media.country ? String(media.country) : "",
+      originalLanguage: media.language ? String(media.language) : ""
+    },
     itemTitle: media.title || "",
     playerTitle: media.title || "",
     playerSubtitle: media.episodeTitle || "",
@@ -382,6 +389,15 @@ async function runCommand(message) {
       // Same path as the on-screen "Skip Intro"/"Skip Recap" button.
       safe(() => player.skipActiveInterval());
       break;
+    case "speed": {
+      // Same path as the speed dialog, so party rules and the label stay in sync.
+      const rate = Number(message.rate);
+      const supported = safe(() => player.getPlaybackSpeedOptions(), []) || [];
+      if (supported.some((option) => Math.abs(option - rate) < 0.01)) {
+        await safe(() => player.applyPlaybackSpeed(rate));
+      }
+      break;
+    }
     default:
       break;
   }

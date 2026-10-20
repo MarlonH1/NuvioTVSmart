@@ -43,7 +43,8 @@ var COMMANDS = {
   audio: true,
   subtitle: true,
   subtitleDelay: true,
-  skip: true
+  skip: true,
+  speed: true
 };
 
 function randomCode() {
@@ -370,7 +371,8 @@ function createHub(deps) {
       positionMs: request.positionMs,
       deltaMs: request.deltaMs,
       trackId: request.trackId,
-      delayMs: request.delayMs
+      delayMs: request.delayMs,
+      rate: request.rate
     });
     return null;
   }
