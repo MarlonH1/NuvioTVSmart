@@ -20,10 +20,14 @@ export function buildHeroBackdropSources(item = null) {
   ]);
   // Hero backgrounds can fall back to episode stills. Keep series artwork, but
   // do not reveal a protected thumbnail through that fallback path.
-  if (item?.heroSource !== "continueWatching" || !shouldBlurContinueWatchingThumbnail(item, {
-    enabled: Boolean(LayoutPreferences.get().blurUnwatchedEpisodes),
-    useEpisodeThumbnails: true
-  })) return sources;
+  if (
+    item?.heroSource !== "continueWatching" ||
+    !shouldBlurContinueWatchingThumbnail(item, {
+      enabled: Boolean(LayoutPreferences.get().blurUnwatchedEpisodes),
+      useEpisodeThumbnails: true
+    })
+  )
+    return sources;
   const protectedSources = new Set(
     [item?.thumbnail, item?.episodeThumbnail].filter(Boolean).map(normalizeTmdbBackdropUrl)
   );

@@ -3274,4 +3274,6 @@
     <string name="nuvio_remote_status_off">Off</string>
     <string name="nuvio_remote_pair_title">Pair %1$s</string>
     <string name="nuvio_remote_pair_hint">Enter this code on your phone.</string>
+    <string name="stream_resume_from_time">Resume from %1$s</string>
+    <string name="stream_resume_from_percent">Resume from %1$d%</string>
 </resources>

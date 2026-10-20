@@ -25,27 +25,40 @@ export async function refreshEpisodePanelWatchedState(screen) {
     screen.episodePanelWatchedRequest !== request ||
     !screen.isActiveMountToken(mountToken) ||
     ProfileManager.getActiveProfileId() !== profileId
-  ) return;
-  const completed = [...watched, ...progress.filter(isWatchProgressCompleted)].filter(
-    (item) => watchedItemsShareIdentity(item, reference)
+  )
+    return;
+  const completed = [...watched, ...progress.filter(isWatchProgressCompleted)].filter((item) =>
+    watchedItemsShareIdentity(item, reference)
   );
   screen.episodePanelWatchedKeys = new Set(
-    screen.episodes.filter((episode) => completed.some((item) =>
-      (item.videoId && item.videoId === episode.id) ||
-      (item.season != null && item.episode != null && episodeKey(item) === episodeKey(episode))
-    )).map(episodeKey)
+    screen.episodes
+      .filter((episode) =>
+        completed.some(
+          (item) =>
+            (item.videoId && item.videoId === episode.id) ||
+            (item.season != null &&
+              item.episode != null &&
+              episodeKey(item) === episodeKey(episode))
+        )
+      )
+      .map(episodeKey)
   );
   // Update only images, preserving remote focus and the selected season.
   screen.uiRefs?.root?.querySelectorAll("[data-episode-index]").forEach((card) => {
     const episode = screen.episodes[Number(card.dataset.episodeIndex)];
-    card.querySelector(".player-episode-thumb")?.classList.toggle(
-      "is-blurred",
-      Boolean(LayoutPreferences.get().blurUnwatchedEpisodes) && !screen.episodePanelWatchedKeys.has(episodeKey(episode))
-    );
+    card
+      .querySelector(".player-episode-thumb")
+      ?.classList.toggle(
+        "is-blurred",
+        Boolean(LayoutPreferences.get().blurUnwatchedEpisodes) &&
+          !screen.episodePanelWatchedKeys.has(episodeKey(episode))
+      );
   });
 }
 
 export function shouldBlurPlayerEpisode(screen, episode) {
-  return Boolean(LayoutPreferences.get().blurUnwatchedEpisodes) &&
-    !screen.episodePanelWatchedKeys?.has(episodeKey(episode));
+  return (
+    Boolean(LayoutPreferences.get().blurUnwatchedEpisodes) &&
+    !screen.episodePanelWatchedKeys?.has(episodeKey(episode))
+  );
 }
