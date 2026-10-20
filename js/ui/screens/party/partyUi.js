@@ -441,6 +441,15 @@ export async function showInviteDialog(party, { onDismiss = null } = {}) {
         <div class="party-invite-share">${escapeHtml(t("party_invite_share"))}</div>
         <div class="party-invite-friend-status" role="status" aria-live="polite"></div>`;
       status = copy.querySelector(".party-invite-friend-status");
+      if (!friendButtons.length) {
+        setStatus(
+          t(
+            "party_friend_none",
+            [],
+            "Add friends in Settings > Watch party to invite them from here."
+          )
+        );
+      }
       wrap.appendChild(canvas);
       wrap.appendChild(copy);
       return wrap;

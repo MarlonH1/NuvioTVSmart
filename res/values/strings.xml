@@ -3285,6 +3285,7 @@
     <string name="party_friend_invite_title">Watch party invite</string>
     <string name="party_friend_invite_message">%1$s invites you to watch %2$s.</string>
     <string name="party_friend_invite_unknown_message">%1$s (not in your friends) invites you to watch %2$s.</string>
+    <string name="party_friend_none">Add friends in Settings &gt; Watch party to invite them from here.</string>
     <string name="nuvio_remote_title">Phone remote</string>
     <string name="nuvio_remote_settings_description">Control Nuvio on this TV from your phone</string>
     <string name="nuvio_remote_toggle_title">Allow phone remote</string>

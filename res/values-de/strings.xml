@@ -2566,6 +2566,7 @@
     <string name="party_friend_invite_title">Watch-Party-Einladung</string>
     <string name="party_friend_invite_message">%1$s lädt dich ein, %2$s zu schauen.</string>
     <string name="party_friend_invite_unknown_message">%1$s (nicht in deinen Freunden) lädt dich ein, %2$s zu schauen.</string>
+    <string name="party_friend_none">Füge in Einstellungen &gt; Watch Party Freunde hinzu, um sie hier einzuladen.</string>
     <string name="nuvio_remote_title">Handy-Fernbedienung</string>
     <string name="nuvio_remote_settings_description">Nuvio auf diesem Fernseher mit dem Handy steuern</string>
     <string name="nuvio_remote_toggle_title">Handy als Fernbedienung erlauben</string>
