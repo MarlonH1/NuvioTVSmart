@@ -1,3 +1,4 @@
+import { refreshEpisodePanelWatchedState } from "./episodePanelThumbnailPrivacy.js";
 import { loadPlayerShuffleWatched } from "./playerEpisodeShuffle.js";
 import { activeStreamLinkProfile } from "../../../data/local/streamLinkCacheStore.js";
 /* global __NUVIO_APP_VERSION__ */
@@ -44,6 +45,8 @@ export function createPlayerScreenMethods01() {
       this.playerMountToken = mountToken;
       this.shuffleNextCache = null;
       this.shuffleRemoteWatched = new Set();
+      this.episodePanelWatchedKeys = new Set();
+      this.episodePanelWatchedRequest = null;
       this.playerRouteActive = true;
       this.webOsClockLocaleInfo = null;
       this.webOsClockSettingsSubscription?.cancel?.();
@@ -187,6 +190,7 @@ export function createPlayerScreenMethods01() {
         void this.fetchSkipIntervals();
         void this.hydratePauseOverlayMeta();
         void loadPlayerShuffleWatched(this, mountToken);
+        void refreshEpisodePanelWatchedState(this);
         void this.loadPostPlayEpisodeMetadata(mountToken);
       }
       this.renderEpisodePanel();

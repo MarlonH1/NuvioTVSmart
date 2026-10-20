@@ -463,3 +463,11 @@
 .player-skip-intro.is-raised {
   bottom: var(--player-action-controls-open-bottom);
 }
+
+/* Only artwork is blurred: episode labels and player controls stay readable. */
+.player-episode-thumb.is-blurred,
+.player-next-episode-thumb.is-blurred,
+.player-still-watching-thumb.is-blurred {
+  filter: blur(12px);
+  transform: scale(1.08);
+}

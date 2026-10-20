@@ -1,3 +1,4 @@
+import { refreshEpisodePanelWatchedState } from "./episodePanelThumbnailPrivacy.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -242,6 +243,7 @@ export function createPlayerScreenMethods65() {
         return;
       }
       this.episodePanelVisible = true;
+      void refreshEpisodePanelWatchedState(this);
       this.episodePanelMode = "episodes";
       this.episodePanelStreamsError = "";
       this.episodePanelStreamsLoading = false;

@@ -1,3 +1,5 @@
+import { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
+import { shouldBlurContinueWatchingThumbnail } from "../../../core/util/episodeThumbnailPrivacy.js";
 import { uniqueNonEmptyValues } from "./homeUtils.js";
 import { normalizeTmdbBackdropUrl } from "../../../core/tmdb/tmdbImageUrl.js";
 
@@ -7,7 +9,7 @@ import { normalizeTmdbBackdropUrl } from "../../../core/tmdb/tmdbImageUrl.js";
  * @returns {string[]}
  */
 export function buildHeroBackdropSources(item = null) {
-  return uniqueNonEmptyValues([
+  const sources = uniqueNonEmptyValues([
     normalizeTmdbBackdropUrl(item?.background),
     normalizeTmdbBackdropUrl(item?.backdrop),
     normalizeTmdbBackdropUrl(item?.backdropUrl),
@@ -16,6 +18,16 @@ export function buildHeroBackdropSources(item = null) {
     item?.thumbnail,
     item?.episodeThumbnail
   ]);
+  // Hero backgrounds can fall back to episode stills. Keep series artwork, but
+  // do not reveal a protected thumbnail through that fallback path.
+  if (item?.heroSource !== "continueWatching" || !shouldBlurContinueWatchingThumbnail(item, {
+    enabled: Boolean(LayoutPreferences.get().blurUnwatchedEpisodes),
+    useEpisodeThumbnails: true
+  })) return sources;
+  const protectedSources = new Set(
+    [item?.thumbnail, item?.episodeThumbnail].filter(Boolean).map(normalizeTmdbBackdropUrl)
+  );
+  return sources.filter((source) => !protectedSources.has(normalizeTmdbBackdropUrl(source)));
 }
 
 export function encodeHeroBackdropFallbacks(sources = []) {

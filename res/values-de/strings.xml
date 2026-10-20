@@ -755,7 +755,7 @@
     <string name="layout_use_episode_thumbnails_cw">Use Episode Thumbnails in Continue Watching</string>
     <string name="layout_use_episode_thumbnails_cw_sub">Use episode thumbnails as default image. When disabled, uses backdrop.</string>
     <string name="layout_blur_unwatched">Ungesehene Episoden unscharf darstellen</string>
-    <string name="layout_blur_unwatched_sub">Vorschaubild ungesehener Folgen „unscharf” anzeigen. (Spoilervermeidung)</string>
+    <string name="layout_blur_unwatched_sub">Alle ungesehenen Episodenbilder unscharf anzeigen, auch unter „Weiterschauen“ und in der Episodenliste im Player.</string>
     <string name="layout_blur_cw_next_up">Vorschaubild in „Weiterschauen” unscharf anzeigen.</string>
     <string name="layout_blur_cw_next_up_sub">Vorschaubild in „Weiterschauen” „unscharf” anzeigen. (Spoilervermeidung)</string>
     <string name="layout_next_up_furthest_episode">Up Next From Furthest Episode</string>

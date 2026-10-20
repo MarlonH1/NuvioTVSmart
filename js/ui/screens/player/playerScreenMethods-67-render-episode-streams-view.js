@@ -1,3 +1,5 @@
+import { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
+import { episodeKey } from "../../../core/player/episodeShuffle.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -165,6 +167,7 @@ export function createPlayerScreenMethods67() {
             </div>`
         : "";
       const entries = this.getEpisodePanelEntries();
+      const blurUnwatched = Boolean(LayoutPreferences.get().blurUnwatchedEpisodes);
       const cards = entries
         .map(({ episode, index }) => {
           const selected = index === this.episodePanelIndex;
@@ -175,11 +178,12 @@ export function createPlayerScreenMethods67() {
             (Number(episode?.season) === Number(this.params?.season) && Number(episode?.episode) === Number(this.params?.episode));
           const code = episodeDisplayCode(episode);
           const thumbnail = episodeThumbnailUrl(episode);
+          const shouldBlur = blurUnwatched && !this.episodePanelWatchedKeys?.has(episodeKey(episode));
           const date = formatEpisodePanelDate(episode.released);
           return `
             <div class="player-episode-item focusable${selectedClass}" tabindex="-1" data-episode-index="${index}">
               <div class="player-episode-thumb-wrap">
-                ${thumbnail ? `<img class="player-episode-thumb" src="${escapeAttribute(thumbnail)}" alt="" />` : `<div class="player-episode-thumb-fallback"></div>`}
+                ${thumbnail ? `<img class="player-episode-thumb${shouldBlur ? " is-blurred" : ""}" src="${escapeAttribute(thumbnail)}" alt="" />` : `<div class="player-episode-thumb-fallback"></div>`}
                 ${code ? `<div class="player-episode-code">${escapeHtml(code)}</div>` : ""}
                 ${current ? `<div class="player-episode-current">&#10003;</div>` : ""}
               </div>

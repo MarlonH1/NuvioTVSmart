@@ -1,3 +1,4 @@
+import { refreshEpisodePanelWatchedState } from "./episodePanelThumbnailPrivacy.js";
 import { syncHtmlSubtitleClearance } from "./subtitleOverlayClearance.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
@@ -49,6 +50,7 @@ export function createPlayerScreenMethods24() {
       this.setControlsVisible(true, { focus: false });
       this.episodePanelIndex = episodeIndex;
       this.episodePanelVisible = true;
+      void refreshEpisodePanelWatchedState(this);
       this.episodePanelMode = "streams";
       this.episodePanelStreamVideoId = String(nextEpisode.videoId || "");
       this.episodePanelStreamFilter = "all";

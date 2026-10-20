@@ -1,3 +1,4 @@
+import { shouldBlurContinueWatchingThumbnail } from "../../../core/util/episodeThumbnailPrivacy.js";
 import { customPosterForItem, posterFallbackAttributes } from "../../../core/poster/customPoster.js";
 /* eslint-disable no-unused-vars */
 import { Router } from "../../navigation/routerState.js";
@@ -290,7 +291,11 @@ export function renderContinueWatchingCard(item, index, options = {}) {
     .toLowerCase();
   const cardStyle = ["card", "wide", "poster"].includes(requestedCardStyle) ? requestedCardStyle : "card";
   const useEpisodeThumbnails = continueWatchingUsesEpisodeThumbnails(cardStyle, options?.useEpisodeThumbnails);
-  const blurNextUp = Boolean(options?.blurNextUp && isNextUp && useEpisodeThumbnails);
+  const blurNextUp = shouldBlurContinueWatchingThumbnail(normalized, {
+    enabled: Boolean(LayoutPreferences.get().blurUnwatchedEpisodes),
+    blurNextUp: Boolean(options?.blurNextUp),
+    useEpisodeThumbnails
+  });
   const rowKey = String(options?.rowKey || "continue_watching").trim() || "continue_watching";
   const cardImageSources = continueWatchingImageSources(
     {

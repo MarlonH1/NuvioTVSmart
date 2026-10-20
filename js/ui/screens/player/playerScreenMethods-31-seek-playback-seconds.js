@@ -1,3 +1,4 @@
+import { shouldBlurPlayerEpisode } from "./episodePanelThumbnailPrivacy.js";
 import { syncHtmlSubtitleClearance } from "./subtitleOverlayClearance.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
@@ -242,7 +243,9 @@ export function createPlayerScreenMethods31() {
               `Playing via ${this.nextEpisodeCardSourceName} in ${this.nextEpisodeCardCountdownSec}s`
             )
           : airDateText;
-      const thumb = this.episodes.find((entry) => String(entry?.id || "") === String(nextEpisode.videoId || ""))?.thumbnail || "";
+      const nextEpisodeEntry = this.episodes.find((entry) => String(entry?.id || "") === String(nextEpisode.videoId || ""));
+      const thumb = nextEpisodeEntry?.thumbnail || "";
+      const shouldBlur = shouldBlurPlayerEpisode(this, nextEpisodeEntry);
 
       const renderKey = JSON.stringify([
         nextEpisode.videoId,
@@ -250,6 +253,7 @@ export function createPlayerScreenMethods31() {
         statusText,
         progressText,
         thumb,
+        shouldBlur,
         Boolean(nextEpisode.hasAired),
         Boolean(this.controlsVisible)
       ]);
@@ -257,7 +261,7 @@ export function createPlayerScreenMethods31() {
         card.innerHTML = `
             <div class="player-next-episode-card-inner focusable${nextEpisode.hasAired ? " is-playable" : ""}${!this.controlsVisible && this.controlFocusZone === "nextEpisode" ? " is-selected" : ""}" tabindex="-1" role="button" data-player-pointer-action="nextEpisode">
               <div class="player-next-episode-thumb-wrap">
-                ${thumb ? `<img class="player-next-episode-thumb" src="${escapeHtml(thumb)}" alt="" aria-hidden="true" />` : `<div class="player-next-episode-thumb player-next-episode-thumb-fallback"></div>`}
+                ${thumb ? `<img class="player-next-episode-thumb${shouldBlur ? " is-blurred" : ""}" src="${escapeHtml(thumb)}" alt="" aria-hidden="true" />` : `<div class="player-next-episode-thumb player-next-episode-thumb-fallback"></div>`}
                 <div class="player-next-episode-thumb-shade"></div>
               </div>
               <div class="player-next-episode-copy">

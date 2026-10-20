@@ -1,3 +1,4 @@
+import { shouldBlurPlayerEpisode } from "./episodePanelThumbnailPrivacy.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -139,7 +140,7 @@ export function createPlayerScreenMethods20() {
         const thumbnail = episodeThumbnailUrl(episode);
         overlay.innerHTML = `
             <div class="player-pause-overlay-content player-still-watching-content">
-              ${thumbnail ? `<img class="player-still-watching-thumb" src="${escapeAttribute(thumbnail)}" alt="" aria-hidden="true" />` : ""}
+              ${thumbnail ? `<img class="player-still-watching-thumb${shouldBlurPlayerEpisode(this, episode) ? " is-blurred" : ""}" src="${escapeAttribute(thumbnail)}" alt="" aria-hidden="true" />` : ""}
               <div class="player-still-watching-copy">
                 <div class="player-still-watching-kicker">${escapeHtml(t("still_watching_title", {}, "Are you still watching?"))}</div>
                 <div class="player-still-watching-title">${escapeHtml(titleLine || t("next_episode_label", {}, "Next episode"))}</div>

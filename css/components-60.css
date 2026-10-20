@@ -218,12 +218,20 @@
   line-clamp: 5 !important;
 }
 
-/* Static dim instead of per-pixel software blur on unwatched thumbs. */
+/* Hide spoiler artwork when software blur is too expensive. Dimming still reveals spoilers. */
 .performance-constrained .series-episode-image.is-blurred,
-.legacy-tizen .series-episode-image.is-blurred {
+.legacy-tizen .series-episode-image.is-blurred,
+.performance-constrained .player-next-episode-thumb.is-blurred,
+.legacy-tizen .player-next-episode-thumb.is-blurred,
+.performance-constrained .player-still-watching-thumb.is-blurred,
+.legacy-tizen .player-still-watching-thumb.is-blurred,
+.performance-constrained .player-episode-thumb.is-blurred,
+.legacy-tizen .player-episode-thumb.is-blurred,
+.performance-constrained .home-continue-card-blur-next-up .home-continue-bg,
+.legacy-tizen .home-continue-card-blur-next-up .home-continue-bg {
   filter: none !important;
   transform: none !important;
-  opacity: 0.5 !important;
+  opacity: 0 !important;
 }
 
 /* ---- Tizen micro-motion (all Samsung): transform/opacity only, <=160ms.
