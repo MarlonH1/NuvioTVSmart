@@ -19,6 +19,7 @@ export function createPlayerScreenMethods32() {
       if (PlayerController.startupPresentationAudioMuted && this.hasPresentedPlaybackFrame && !this.loadingVisible) {
         PlayerController.setStartupPresentationAudioMuted?.(false);
       }
+      this.maybeApplyAnimePlaybackSpeed();
       this.ensureNextEpisodeStreamsPrefetch();
       this.shouldShowNextEpisodeCard();
       void this.refreshLoadingOverlayProgress();

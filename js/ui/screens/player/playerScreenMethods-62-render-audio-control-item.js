@@ -143,11 +143,16 @@ export function createPlayerScreenMethods62() {
       this.updateModalBackdrop();
       this.resetControlsAutoHide();
     },
-    // Runs on each "playing" event; acts once per item so manual speed changes
-    // made during an episode are kept until the next one starts.
+    // Runs on "playing" events and UI ticks; acts once per item and source so
+    // manual speed changes made during an episode are kept until the next one.
     maybeApplyAnimePlaybackSpeed() {
+      // webOS accepts a rate change during the startup gate's pause/resume but
+      // keeps presenting at 1x, so wait until startup has fully settled.
+      if (!this.hasPresentedPlaybackFrame || this.startupAudioGateActive || this.loadingVisible || this.paused || this.seekLoading) {
+        return;
+      }
       const params = this.params || {};
-      const itemKey = [params.itemId, params.videoId, params.season, params.episode].join(":");
+      const itemKey = [params.itemId, params.videoId, params.season, params.episode, this.activePlaybackUrl].join(":");
       if (this.animePlaybackSpeedItemKey === itemKey) {
         return;
       }
@@ -159,9 +164,17 @@ export function createPlayerScreenMethods62() {
       const meta = metaRepository.getCachedMeta?.(params.itemType, params.itemId) || null;
       if (isAnimeContent({ itemId: params.itemId, itemType: params.itemType, meta })) {
         PlayerController.animePlaybackSpeedActive = true;
-        if (Math.abs(this.getPlaybackSpeed() - settings.animePlaybackSpeed) > 0.01) {
-          void this.applyPlaybackSpeed(settings.animePlaybackSpeed);
-        }
+        // Always send it: the controller can still report the previous
+        // episode's rate while the new native pipeline runs at 1x.
+        const speed = settings.animePlaybackSpeed;
+        void this.applyPlaybackSpeed(speed);
+        // The first command after startup is occasionally acknowledged without
+        // taking effect; repeating it is harmless when it already applied.
+        setTimeout(() => {
+          if (this.animePlaybackSpeedItemKey === itemKey && Math.abs(this.getPlaybackSpeed() - speed) <= 0.01) {
+            void this.applyPlaybackSpeed(speed);
+          }
+        }, 1500);
         return;
       }
       // Speed is kept on the shared controller, so drop a carried-over anime speed.
