@@ -209,6 +209,7 @@ export function createStreamScreenMethods08() {
       const badgePlacement = resolveStreamBadgePlacement(badgeSettings);
       const topBadges = badgePlacement === "TOP" ? badges : "";
       const bottomBadges = badgePlacement === "BOTTOM" ? badges : "";
+      // Filename punctuation needs wrap opportunities to avoid an icon-only first line.
       const descriptionLines = getStreamDescriptionLines(stream);
       let addonIdentity = "";
       if (showAddonLogo) {
@@ -242,7 +243,7 @@ export function createStreamScreenMethods08() {
           ? ` style="margin-bottom:${virtualLast ? 0 : Math.max(0, Number(virtualRowGap))}px"`
           : "";
       return `
-          <div class="stream-route-card-row${partyShared ? " is-party-shared" : ""}" data-stream-key="${escapeHtml(streamKey)}" data-stream-row="${index}"${virtualRowStyle}>
+          <div class="stream-route-card-row${partyShared ? " is-party-shared" : ""}" data-stream-key="${escapeHtml(String(streamKey))}" data-stream-row="${index}"${virtualRowStyle}>
             ${partyShared ? `<div class="stream-route-party-label">${escapeHtml(t("party_shared_by", [stream.partyHostName || ""], "Shared by %1$s"))}</div>` : ""}
             <article class="stream-route-card stream-route-card-action focusable${partyShared || partySource ? " is-party-marked" : ""}${this.isCardActionFocused(index, "play") ? " focused" : ""}"
                      data-action="playStream"
@@ -253,7 +254,7 @@ export function createStreamScreenMethods08() {
                 ${topBadges || ""}
                 <div class="stream-route-card-heading" dir="${contentTextDirection(headline)}">${escapeHtml(headline)}${partySource ? `<span class="stream-route-party-chip">${escapeHtml(t("party_source", {}, "Party's source"))}</span>` : ""}</div>
                 ${pluginSourceName && pluginSourceName !== stream.addonName ? `<div class="stream-route-plugin-source" dir="${contentTextDirection(pluginSourceName)}">${escapeHtml(pluginSourceName)}</div>` : ""}
-                ${descriptionLines.map((line, lineIndex) => `<div class="stream-route-card-line${lineIndex > 0 ? " secondary" : ""}" dir="${contentTextDirection(line)}">${escapeHtml(line)}</div>`).join("")}
+                ${descriptionLines.map((line, lineIndex) => `<div class="stream-route-card-line${lineIndex > 0 ? " secondary" : ""}" dir="${contentTextDirection(line)}">${escapeHtml(line).replace(/([._-])(?=\S)/g, "$1<wbr>")}</div>`).join("")}
                 ${bottomBadges || ""}
               </div>
               ${addonIdentity}
