@@ -610,3 +610,58 @@ test("luna subscriber parses line-delimited replies and restarts nothing after s
   stop();
   assert.strictEqual(spawned.length, 1);
 });
+
+test("party state reaches phones and invites go through the app", async () => {
+  const env = await setup();
+  try {
+    const { phone } = await pairPhone(env);
+    const app = await env.connect("/app");
+    app.send({ type: "app.hello" });
+    const party = {
+      code: "ABC234",
+      title: "Frieren",
+      maxMembers: 3,
+      isHost: true,
+      members: [{ name: "Marlon", host: true, self: true }]
+    };
+    app.send({ type: "party.state", party });
+    assert.deepStrictEqual((await phone.next("party.state")).party, party);
+
+    phone.send({ type: "party.invite", id: "i1", friendCode: "GGGGHHHHJJJJ" });
+    const forwarded = await app.next("party.invite");
+    assert.strictEqual(forwarded.friendCode, "GGGGHHHHJJJJ");
+    app.send({ type: "party.invite.result", requestId: forwarded.requestId, ok: true });
+    const result = await phone.next("party.invite.result");
+    assert.deepStrictEqual(
+      { id: result.id, ok: result.ok, friendCode: result.friendCode, code: result.code },
+      { id: "i1", ok: true, friendCode: "GGGGHHHHJJJJ", code: undefined }
+    );
+
+    phone.send({ type: "party.invite", id: "i2", friendCode: "KKKKLLLLMMMM" });
+    const second = await app.next("party.invite");
+    app.send({
+      type: "party.invite.result",
+      requestId: second.requestId,
+      ok: false,
+      code: "party_full"
+    });
+    const failed = await phone.next("party.invite.result");
+    assert.strictEqual(failed.ok, false);
+    assert.strictEqual(failed.code, "party_full");
+
+    phone.send({ type: "state.get" });
+    assert.deepStrictEqual((await phone.next("party.state")).party, party, "state.get repeats it");
+
+    phone.send({ type: "party.invite", id: "i3", friendCode: "NNNNPPPPQQQQ" });
+    await app.next("party.invite");
+    app.close();
+    const dropped = await phone.next("party.invite.result");
+    assert.strictEqual(dropped.code, "no_player", "a closing app fails pending invites");
+    assert.strictEqual((await phone.next("party.state")).party, null);
+
+    phone.send({ type: "party.invite", id: "i4", friendCode: "NNNNPPPPQQQQ" });
+    assert.strictEqual((await phone.next("error")).code, "no_player");
+  } finally {
+    env.teardown();
+  }
+});

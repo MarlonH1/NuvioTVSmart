@@ -1,10 +1,16 @@
 // Android ui/screens/party/PartyEffects.kt: app-wide watch party toasts and
 // an availability refresh whenever the app comes to the foreground.
 import { PartyRepository } from "../../../core/party/partyRepository.js";
-import { PartyEventType } from "../../../core/party/partyModels.js";
-import { PartyFriends } from "../../../core/party/partyFriends.js";
+import { PartyEventType, partyMember } from "../../../core/party/partyModels.js";
+import {
+  PartyFriends,
+  isValidFriendCode,
+  normalizeFriendCode
+} from "../../../core/party/partyFriends.js";
+import { setRemotePartySource } from "../../../core/remote/nuvioRemoteBridge.js";
+import { ProfileManager } from "../../../core/profile/profileManager.js";
 import { Router } from "../../navigation/routerState.js";
-import { showConfirmDialog, t } from "./partyUi.js";
+import { displayTitle, showConfirmDialog, t } from "./partyUi.js";
 
 const TOAST_DURATION_MS = 2000;
 let installed = false;
@@ -69,11 +75,44 @@ function showFriendInvite(invite, repository) {
   });
 }
 
+// Same name source as watch party members: the active profile's name.
+async function activeProfileName() {
+  const activeId = String(ProfileManager.getActiveProfileId() || "1");
+  const profiles = await ProfileManager.getProfiles().catch(() => []);
+  const profile = profiles.find(
+    (entry) => String(entry.id || entry.profileIndex || "1") === activeId
+  );
+  return String(profile?.name || "").trim();
+}
+
+// party.invite from the phone remote: the TV sends the invite with its own party code.
+async function inviteFromRemote(repository, rawCode) {
+  const party = repository.getState().party;
+  if (!party) return { ok: false, code: "no_party" };
+  if (party.members.length >= party.maxMembers) return { ok: false, code: "party_full" };
+  const code = normalizeFriendCode(rawCode);
+  if (!isValidFriendCode(code)) return { ok: false, code: "invalid_code" };
+  if (code === PartyFriends.getOwnCode()) return { ok: false, code: "own_code" };
+  const sent = await PartyFriends.sendInvite(PartyFriends.findByCode(code) || { code, name: "" }, {
+    partyCode: party.code,
+    title: displayTitle(party.media),
+    fromName: partyMember(party, party.memberId)?.display_name || ""
+  });
+  return sent ? { ok: true } : { ok: false, code: "send_failed" };
+}
+
 export function installPartyEffects(repository = PartyRepository) {
   if (installed) return;
   installed = true;
   repository.subscribeEvents((event) => showPartyToast(partyEventMessage(event)));
+  PartyFriends.setOwnNameProvider(activeProfileName);
   PartyFriends.listen((invite) => showFriendInvite(invite, repository));
+  PartyFriends.installAccountSync();
+  setRemotePartySource({
+    getParty: () => repository.getState().party,
+    subscribe: (listener) => repository.subscribeState(listener),
+    invite: (friendCode) => inviteFromRemote(repository, friendCode)
+  });
   void repository.refreshAvailability();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") void repository.refreshAvailability();

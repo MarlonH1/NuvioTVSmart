@@ -346,6 +346,55 @@ try {
   assert.deepEqual(playerCalls.at(-1), ["media", "pause"]);
   setVisibility("visible");
 
+  // Watch party: the TV reports its party and sends invites the phone asks for.
+  let partyListener = null;
+  const invites = [];
+  let activeParty = {
+    code: "ABC234",
+    media: { title: "Frieren", season: 1, episode: 2, poster: null },
+    memberId: "m1",
+    hostMemberId: "m1",
+    maxMembers: 3,
+    members: [
+      { id: "m1", display_name: "Marlon" },
+      { id: "m2", display_name: "Sam" }
+    ]
+  };
+  bridge.setRemotePartySource({
+    getParty: () => activeParty,
+    subscribe: (listener) => {
+      partyListener = listener;
+    },
+    invite: async (friendCode) => {
+      invites.push(friendCode);
+      return friendCode === "GGGGHHHHJJJJ" ? { ok: true } : { ok: false, code: "send_failed" };
+    }
+  });
+  const partyState = await phone.next("party.state", (m) => m.party?.code === "ABC234");
+  assert.deepEqual(partyState.party, {
+    code: "ABC234",
+    title: "Frieren",
+    season: 1,
+    episode: 2,
+    poster: null,
+    maxMembers: 3,
+    isHost: true,
+    members: [
+      { name: "Marlon", host: true, self: true },
+      { name: "Sam", host: false, self: false }
+    ]
+  });
+  phone.send({ type: "party.invite", id: "inv1", friendCode: "GGGGHHHHJJJJ" });
+  const invited = await phone.next("party.invite.result", (m) => m.id === "inv1");
+  assert.equal(invited.ok, true);
+  phone.send({ type: "party.invite", id: "inv2", friendCode: "KKKKLLLLMMMM" });
+  const notInvited = await phone.next("party.invite.result", (m) => m.id === "inv2");
+  assert.deepEqual([notInvited.ok, notInvited.code], [false, "send_failed"]);
+  assert.deepEqual(invites, ["GGGGHHHHJJJJ", "KKKKLLLLMMMM"]);
+  activeParty = null;
+  partyListener();
+  assert.equal((await phone.next("party.state", (m) => m.party === null)).party, null);
+
   // Turning the feature off disconnects; the daemon then reports idle to the phone.
   bridge.setNuvioRemoteEnabled(false);
   await phone.next("state", (m) => m.playback.status === "idle");

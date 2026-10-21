@@ -29,7 +29,7 @@ export function createSettingsScreenMethods03() {
                     data-text-dialog-role="field"
                     type="${this.textDialog.secret ? "password" : "text"}"
                     autocomplete="off"
-                    autocapitalize="none"
+                    autocapitalize="${escapeAttribute(this.textDialog.autocapitalize || "none")}"
                     spellcheck="false"
                     placeholder="${escapeAttribute(this.textDialog.placeholder || "")}"
                     value="${escapeAttribute(this.textDialog.draft)}" />`;
@@ -80,7 +80,16 @@ export function createSettingsScreenMethods03() {
         field.__settingsTextDialogBound = true;
         field.addEventListener("input", (event) => {
           if (this.textDialog) {
-            this.textDialog.draft = String(event.target?.value ?? "");
+            let text = String(event.target?.value ?? "");
+            if (this.textDialog.format) {
+              const formatted = this.textDialog.format(text);
+              if (formatted !== text && event.target) {
+                event.target.value = formatted;
+                event.target.setSelectionRange?.(formatted.length, formatted.length);
+              }
+              text = formatted;
+            }
+            this.textDialog.draft = text;
             this.textDialog.statusMessage = "";
           }
         });

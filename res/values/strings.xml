@@ -3268,6 +3268,11 @@
     <string name="party_friend_own_code_sub">Share it so friends can invite you to their watch party.</string>
     <string name="party_friend_add">Add friend</string>
     <string name="party_friend_add_sub">Enter their friend code to invite them from a watch party.</string>
+    <string name="party_friends_heading">Friends</string>
+    <string name="party_friends_heading_sub">Friends you can invite to a watch party. Names come from their own profile.</string>
+    <string name="party_friends_list">Your friends (%1$d)</string>
+    <string name="party_friends_list_sub">Everyone you can invite. Select a friend to remove them.</string>
+    <string name="party_friend_name_pending">Waiting for their name</string>
     <string name="party_friend_add_code">Friend code</string>
     <string name="party_friend_add_name">Friend's name</string>
     <string name="party_friend_next">Next</string>
@@ -3276,7 +3281,7 @@
     <string name="party_friend_error_name">Enter a name.</string>
     <string name="party_friend_error_full">Your friend list is full.</string>
     <string name="party_friend_remove_title">Remove %1$s?</string>
-    <string name="party_friend_remove_message">They keep your friend code, so they can still send you invites.</string>
+    <string name="party_friend_remove_message">You are removed from their friends as well.</string>
     <string name="party_friend_send">Invite %1$s</string>
     <string name="party_friend_sending">Sending invite to %1$s…</string>
     <string name="party_friend_sent">Invite sent to %1$s</string>

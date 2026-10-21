@@ -157,6 +157,10 @@ export function createDefaultExpandedState(sectionId) {
     };
   }
 
+  if (sectionId === "watchParty") {
+    return { friends: false };
+  }
+
   return {};
 }
 
@@ -177,7 +181,8 @@ export function normalizeExpandedSections(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
     layout: normalizeExpandedState("layout", source.layout),
-    playback: normalizeExpandedState("playback", source.playback)
+    playback: normalizeExpandedState("playback", source.playback),
+    watchParty: normalizeExpandedState("watchParty", source.watchParty)
   };
 }
 

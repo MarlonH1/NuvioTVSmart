@@ -621,6 +621,47 @@ class AuthManagerClass {
   }
 
   // ------------------------------------
+  // CURRENT AUTH USER (user_metadata)
+  // ------------------------------------
+
+  // Signed-in, non-anonymous account requests against /auth/v1/user. Returns
+  // null when there is no account session; retries once after a forced refresh.
+  async fetchAuthUser(init = {}) {
+    if (this.state !== AuthState.AUTHENTICATED || SessionStore.isAnonymousSession) return null;
+    const generation = this.sessionGeneration;
+    const refreshed = await this.refreshSessionIfNeeded();
+    if (!refreshed || !SessionStore.accessToken || generation !== this.sessionGeneration)
+      return null;
+    const request = () =>
+      fetchSupabaseAuth("/auth/v1/user", {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          apikey: publishableKey(),
+          Authorization: `Bearer ${SessionStore.accessToken}`
+        },
+        signal: this.getSessionSignal()
+      });
+    let res = await request();
+    if (res.status === 401 && (await this.refreshSessionIfNeeded({ force: true }))) {
+      if (generation !== this.sessionGeneration) return null;
+      res = await request();
+    }
+    if (generation !== this.sessionGeneration) return null;
+    if (!res.ok) throw new Error(await parseResponseError(res, "User request failed"));
+    return res.json();
+  }
+
+  getAuthUser() {
+    return this.fetchAuthUser({ method: "GET" });
+  }
+
+  // GoTrue merges top-level keys into user_metadata, so other keys stay as they are.
+  updateUserMetadata(data) {
+    return this.fetchAuthUser({ method: "PUT", body: JSON.stringify({ data }) });
+  }
+
+  // ------------------------------------
   // EFFECTIVE USER ID (PORTING CACHE LOGIC)
   // ------------------------------------
 

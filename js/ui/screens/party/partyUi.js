@@ -2,7 +2,7 @@
 // PartyCode.kt and PartyDetails.kt.
 import { I18n } from "../../../i18n/index.js";
 import { NuvioDialog } from "../../components/nuvioDialog.js";
-import { PartyFriends } from "../../../core/party/partyFriends.js";
+import { PartyFriends, friendDisplayName } from "../../../core/party/partyFriends.js";
 import {
   PARTY_CODE_LENGTH,
   PartyError,
@@ -394,27 +394,26 @@ export async function showInviteDialog(party, { onDismiss = null } = {}) {
   const setStatus = (text) => {
     if (status) status.textContent = text;
   };
-  const friendButtons = PartyFriends.list().map((friend) => ({
-    key: `friend:${friend.code}`,
-    label: t("party_friend_send", [friend.name], `Invite ${friend.name}`),
-    onAction: async () => {
-      setStatus(t("party_friend_sending", [friend.name], `Sending invite to ${friend.name}…`));
-      const sent = await PartyFriends.sendInvite(friend, {
-        partyCode: party.code,
-        title: displayTitle(party.media),
-        fromName: partyMember(party, party.memberId)?.display_name || ""
-      });
-      setStatus(
-        sent
-          ? t("party_friend_sent", [friend.name], `Invite sent to ${friend.name}`)
-          : t(
-              "party_friend_send_failed",
-              [friend.name],
-              `Couldn't reach ${friend.name}. Try again.`
-            )
-      );
-    }
-  }));
+  const friendButtons = PartyFriends.list().map((friend) => {
+    const name = friendDisplayName(friend);
+    return {
+      key: `friend:${friend.code}`,
+      label: t("party_friend_send", [name], `Invite ${name}`),
+      onAction: async () => {
+        setStatus(t("party_friend_sending", [name], `Sending invite to ${name}…`));
+        const sent = await PartyFriends.sendInvite(friend, {
+          partyCode: party.code,
+          title: displayTitle(party.media),
+          fromName: partyMember(party, party.memberId)?.display_name || ""
+        });
+        setStatus(
+          sent
+            ? t("party_friend_sent", [name], `Invite sent to ${name}`)
+            : t("party_friend_send_failed", [name], `Couldn't reach ${name}. Try again.`)
+        );
+      }
+    };
+  });
   dialog = new NuvioDialog({
     title: t("party_open_seat"),
     widthVw: 66.7,

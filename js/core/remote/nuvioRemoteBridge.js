@@ -44,6 +44,11 @@ let pendingPlayToken = 0;
 let foregroundGuardUntil = 0;
 let lastError = null;
 let lifecycleBound = false;
+// Watch party hooks, installed by the party UI (setRemotePartySource) so this module does not
+// pull in the party repository: getParty() -> active party or null, subscribe(listener),
+// invite(friendCode) -> {ok, code?}.
+let partySource = null;
+let lastPartyJson = "";
 
 export function isNuvioRemoteEnabled() {
   return LocalStore.get(NUVIO_REMOTE_ENABLED_KEY, false) === true;
@@ -65,6 +70,58 @@ export function isNuvioRemoteConnected() {
  */
 export function isNuvioRemoteForegroundRequest() {
   return Date.now() < foregroundGuardUntil;
+}
+
+export function setRemotePartySource(source) {
+  partySource = source || null;
+  partySource?.subscribe?.(() => pushParty());
+  pushParty(true);
+}
+
+/** Party as the phone sees it (protocol: party.state), or null outside a party. */
+export function remotePartyPayload(party) {
+  if (!party?.code) return null;
+  const media = party.media || {};
+  return {
+    code: party.code,
+    title: media.title || "",
+    season: media.season ?? null,
+    episode: media.episode ?? null,
+    poster: media.poster || null,
+    maxMembers: Number(party.maxMembers) || 0,
+    isHost: Boolean(party.memberId) && party.memberId === party.hostMemberId,
+    members: (party.members || []).map((member) => ({
+      name: member.display_name || "",
+      host: member.id === party.hostMemberId,
+      self: member.id === party.memberId
+    }))
+  };
+}
+
+function pushParty(force = false) {
+  if (!isNuvioRemoteConnected()) return;
+  let party = null;
+  try {
+    party = remotePartyPayload(partySource?.getParty?.());
+  } catch (_) {}
+  const json = JSON.stringify(party);
+  if (!force && json === lastPartyJson) return;
+  if (send({ type: "party.state", party })) lastPartyJson = json;
+}
+
+async function partyInvite(message) {
+  let result = { ok: false, code: "no_party" };
+  try {
+    if (partySource?.invite) result = (await partySource.invite(message.friendCode)) || result;
+  } catch (_) {
+    result = { ok: false, code: "failed" };
+  }
+  send({
+    type: "party.invite.result",
+    requestId: message.requestId,
+    ok: result.ok === true,
+    code: result.ok === true ? undefined : result.code || "failed"
+  });
 }
 
 export function startNuvioRemoteBridge() {
@@ -110,6 +167,7 @@ function connect() {
       appId: readAppId()
     });
     pushStateIfChanged(true);
+    pushParty(true);
   };
   ws.onmessage = (event) => {
     let message = null;
@@ -190,6 +248,10 @@ function handleMessage(message) {
       break;
     case "state.get":
       pushStateIfChanged(true);
+      pushParty(true);
+      break;
+    case "party.invite":
+      void partyInvite(message);
       break;
     default:
       break;

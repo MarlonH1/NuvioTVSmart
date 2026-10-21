@@ -2549,6 +2549,11 @@
     <string name="party_friend_own_code_sub">Teile ihn, damit Freunde dich zu ihrer Watch Party einladen können.</string>
     <string name="party_friend_add">Freund hinzufügen</string>
     <string name="party_friend_add_sub">Gib den Freundescode ein, um ihn aus einer Watch Party einzuladen.</string>
+    <string name="party_friends_heading">Freunde</string>
+    <string name="party_friends_heading_sub">Freunde, die du zu einer Watch Party einladen kannst. Die Namen kommen aus ihrem eigenen Profil.</string>
+    <string name="party_friends_list">Deine Freunde (%1$d)</string>
+    <string name="party_friends_list_sub">Alle, die du einladen kannst. Wähle einen Freund aus, um ihn zu entfernen.</string>
+    <string name="party_friend_name_pending">Name wird abgefragt</string>
     <string name="party_friend_add_code">Freundescode</string>
     <string name="party_friend_add_name">Name des Freundes</string>
     <string name="party_friend_next">Weiter</string>
@@ -2557,7 +2562,7 @@
     <string name="party_friend_error_name">Gib einen Namen ein.</string>
     <string name="party_friend_error_full">Deine Freundesliste ist voll.</string>
     <string name="party_friend_remove_title">%1$s entfernen?</string>
-    <string name="party_friend_remove_message">Dein Freundescode bleibt bei ihnen, sie können dir also weiterhin Einladungen senden.</string>
+    <string name="party_friend_remove_message">Du wirst auch aus ihrer Freundesliste entfernt.</string>
     <string name="party_friend_send">%1$s einladen</string>
     <string name="party_friend_sending">Einladung an %1$s wird gesendet…</string>
     <string name="party_friend_sent">Einladung an %1$s gesendet</string>

@@ -11,7 +11,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { copyFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readAppMetadata } from "./appMetadata.mjs";
@@ -163,12 +163,17 @@ if (dryRun) {
   process.exit(0);
 }
 
+// gh names the asset after the file (`file#x` only sets a display label), so
+// copy the ipk under the name the manifest's ipkUrl points to.
+const assetPath = path.join(rootDir, assetName);
+await copyFile(ipkPath, assetPath);
+
 const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" }).trim();
 run("gh", [
   "release",
   "create",
   tag,
-  `${ipkPath}#${assetName}`,
+  assetPath,
   "--repo",
   repo,
   "--target",

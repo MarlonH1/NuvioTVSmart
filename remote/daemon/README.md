@@ -28,10 +28,16 @@ Gleicher flacher JSON-Umschlag wie das Handy-Protokoll, nur von `127.0.0.1` aus 
 | ------------ | ------------------------- | ----------------------------------------------------------- |
 | App → Daemon | `app.hello`               | `version`                                                   |
 | App → Daemon | `state`                   | `playback` (PlaybackState aus dem Protokoll)                |
+| App → Daemon | `party.state`             | `party` (Watch Party oder `null`)                           |
+| App → Daemon | `party.invite.result`     | `requestId`, `ok`, `code?`                                  |
 | Daemon → App | `play`                    | `request` (PlayRequest)                                     |
 | Daemon → App | `cmd`                     | `action`, `positionMs?`, `deltaMs?`, `trackId?`, `delayMs?` |
 | Daemon → App | `pair.show` / `pair.hide` | `code`, `clientName`                                        |
 | Daemon → App | `state.get`               | –                                                           |
+| Daemon → App | `party.invite`            | `requestId`, `friendCode`                                   |
+
+Der Daemon merkt sich die letzte `party.state`, schickt sie neuen Handys und leitet
+`party.invite` mit eigener `requestId` an die App weiter. Die Antwort geht nur an das fragende Handy.
 
 ## Installieren
 

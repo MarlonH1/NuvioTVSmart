@@ -10,9 +10,10 @@
 // watches power state and the foreground app itself and stops reporting "playing" then.
 //
 // Bridge protocol (hub <-> Nuvio app), same flat JSON envelope:
-//   app -> hub: app.hello {version, appId?}, state {playback}
+//   app -> hub: app.hello {version, appId?}, state {playback}, party.state {party},
+//               party.invite.result {requestId, ok, code?}
 //   hub -> app: play {request}, cmd {action, ...}, pair.show {code, clientName}, pair.hide,
-//               state.get
+//               state.get, party.invite {requestId, friendCode}
 "use strict";
 
 var crypto = require("crypto");
@@ -31,6 +32,8 @@ var STALE_CHECK_MS = 5000;
 var WATCH_KEEPALIVE_MS = 600000;
 var ACTIVE_STATUSES = { loading: true, playing: true, paused: true, buffering: true };
 var MAX_CODE_ATTEMPTS = 5;
+// The app answers an invite after one ntfy.sh POST (10 s timeout there).
+var INVITE_TIMEOUT_MS = 15000;
 var UNPAIRED_TYPES = { hello: true, "pair.begin": true, "pair.confirm": true, ping: true };
 var COMMANDS = {
   play: true,
@@ -91,6 +94,10 @@ function createHub(deps) {
   var watchers = [];
   var app = null;
   var playback = idlePlayback(now());
+  // Watch party the app is in (protocol: party.state), null when none or the app is closed.
+  var party = null;
+  var pendingInvites = {};
+  var nextInviteId = 1;
   var volume = { level: null, muted: false };
   var pendingPlay = null;
   var pendingTimer = null;
@@ -244,6 +251,61 @@ function createHub(deps) {
       clearInterval(keepalive);
       var index = watchers.indexOf(res);
       if (index >= 0) watchers.splice(index, 1);
+    });
+  }
+
+  function sendParty(target) {
+    var message = { type: "party.state", party: party };
+    if (target) send(target.connection, message);
+    else broadcast(message);
+  }
+
+  function setParty(next) {
+    var value = next && typeof next === "object" ? next : null;
+    if (JSON.stringify(value) === JSON.stringify(party)) return;
+    party = value;
+    sendParty(null);
+  }
+
+  // The app sends the invite with its own party code, so the phone only names the friend.
+  function invite(phone, request) {
+    var friendCode = typeof request.friendCode === "string" ? request.friendCode : "";
+    if (!friendCode)
+      return { type: "party.invite.result", ok: false, code: "invalid_code", friendCode: "" };
+    if (!app)
+      return { type: "error", code: "no_player", message: "Nuvio is not running on the TV" };
+    var requestId = String(nextInviteId++);
+    var timer = setTimeout(function () {
+      finishInvite(requestId, { ok: false, code: "timeout" });
+    }, INVITE_TIMEOUT_MS);
+    if (typeof timer.unref === "function") timer.unref();
+    pendingInvites[requestId] = {
+      phone: phone,
+      request: request,
+      friendCode: friendCode,
+      timer: timer
+    };
+    send(app, { type: "party.invite", requestId: requestId, friendCode: friendCode });
+    return null;
+  }
+
+  function finishInvite(requestId, result) {
+    var pending = pendingInvites[requestId];
+    if (!pending) return;
+    delete pendingInvites[requestId];
+    clearTimeout(pending.timer);
+    if (phones.indexOf(pending.phone) < 0) return;
+    reply(pending.phone, pending.request, {
+      type: "party.invite.result",
+      ok: result.ok === true,
+      code: result.ok === true ? undefined : String(result.code || "failed"),
+      friendCode: pending.friendCode
+    });
+  }
+
+  function failPendingInvites(code) {
+    Object.keys(pendingInvites).forEach(function (requestId) {
+      finishInvite(requestId, { ok: false, code: code });
     });
   }
 
@@ -454,6 +516,7 @@ function createHub(deps) {
         if (phone.paired) {
           send(phone.connection, { type: "state", playback: playback });
           sendVolume(phone);
+          sendParty(phone);
         }
         return;
       case "pair.begin":
@@ -468,8 +531,12 @@ function createHub(deps) {
       case "state.get":
         reply(phone, request, { type: "state", playback: playback });
         sendVolume(phone);
+        sendParty(phone);
         if (app) send(app, { type: "state.get" });
         return;
+      case "party.invite":
+        response = invite(phone, request);
+        break;
       case "play":
         response = play(request);
         break;
@@ -536,6 +603,10 @@ function createHub(deps) {
         lastAppStateAt = now();
         var next = Object.assign(idlePlayback(now()), message.playback);
         setPlayback(appVisible() ? next : hiddenPlayback(next, now()));
+      } else if (message.type === "party.state") {
+        setParty(message.party);
+      } else if (message.type === "party.invite.result") {
+        finishInvite(String(message.requestId || ""), message);
       }
     });
     connection.on("close", function () {
@@ -543,6 +614,8 @@ function createHub(deps) {
       app = null;
       log("nuvio app disconnected");
       if (!pendingPlay) setPlayback(idlePlayback(now()));
+      setParty(null);
+      failPendingInvites("no_player");
     });
   }
 
@@ -589,6 +662,8 @@ function createHub(deps) {
         }),
         pairedDevices: store.listTokens().length,
         playback: { status: playback.status, title: playback.media ? playback.media.title : null },
+        // No code here: GET / is unauthenticated and the code lets anyone join.
+        party: party ? { members: (party.members || []).length } : null,
         pendingPlay: !!pendingPlay
       };
     },
@@ -600,6 +675,7 @@ function createHub(deps) {
         watcher.end();
       });
       clearPending();
+      failPendingInvites("no_player");
     }
   };
 }

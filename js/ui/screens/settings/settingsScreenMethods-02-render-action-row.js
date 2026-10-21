@@ -214,14 +214,20 @@ export function createSettingsScreenMethods02() {
       saveLabel = t("common.save", {}, "Save"),
       cancelLabel = t("common.cancel", {}, "Cancel"),
       clearLabel = "",
+      // Optional live formatter for the typed text, e.g. upper-casing and grouping a code.
+      format = null,
+      autocapitalize = "none",
       onClear,
       onSubmit
     }) {
       this.optionDialog = null;
+      const initial = typeof format === "function" ? format(String(value ?? "")) : String(value ?? "");
       this.textDialog = {
         title,
-        value: String(value ?? ""),
-        draft: String(value ?? ""),
+        value: initial,
+        draft: initial,
+        format: typeof format === "function" ? format : null,
+        autocapitalize,
         multiline: Boolean(multiline),
         secret: Boolean(secret),
         placeholder,

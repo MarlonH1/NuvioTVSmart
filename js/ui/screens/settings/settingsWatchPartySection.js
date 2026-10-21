@@ -1,21 +1,21 @@
 // Android ui/screens/party/PartySettingsContent.kt: the Watch party entry in Settings,
-// plus the friend list used for one-step invites.
+// plus a Friends subsection used for one-step invites.
 import { Router } from "../../navigation/routerState.js";
 import { PartyRepository } from "../../../core/party/partyRepository.js";
 import { formatPartyCode } from "../../../core/party/partyModels.js";
 import {
+  FRIEND_CODE_LENGTH,
   PartyFriends,
   formatFriendCode,
-  isValidFriendCode,
+  friendDisplayName,
   normalizeFriendCode
 } from "../../../core/party/partyFriends.js";
-import { displayTitle, showConfirmDialog, t } from "../party/partyUi.js";
+import { displayTitle, escapeHtml, showConfirmDialog, t } from "../party/partyUi.js";
 import { SECTION_META } from "./settingsScreenHelpers-03-clamp-subtitle-text-opacity.js";
 
 const FRIEND_ERRORS = {
   invalid_code: ["party_friend_error_code", "Enter the 12-character friend code."],
   own_code: ["party_friend_error_own", "That's your own friend code."],
-  missing_name: ["party_friend_error_name", "Enter a name."],
   too_many: ["party_friend_error_full", "Your friend list is full."]
 };
 
@@ -28,53 +28,45 @@ export function isWatchPartySectionVisible() {
   return PartyRepository.isAvailable();
 }
 
+// Upper-cases, drops anything outside the code alphabet and groups as XXXX-XXXX-XXXX.
+function formatCodeInput(value) {
+  return formatFriendCode(normalizeFriendCode(value).slice(0, FRIEND_CODE_LENGTH));
+}
+
 function registerFriendActions(friends) {
   this.actionMap.set("watchParty:friendCode", () => {});
+  this.actionMap.set("watchParty:toggle:friends", () => {
+    this.toggleExpandedSection("watchParty", "friends");
+  });
   this.actionMap.set("watchParty:addFriend", () => {
     this.openTextDialog({
       title: t("party_friend_add_code", [], "Friend code"),
       placeholder: "XXXX-XXXX-XXXX",
+      format: formatCodeInput,
+      autocapitalize: "characters",
       returnFocusKey: "watchParty:addFriend",
-      saveLabel: t("party_friend_next", [], "Next"),
+      saveLabel: t("party_friend_add", [], "Add friend"),
       onSubmit: (value) => {
-        const code = normalizeFriendCode(value);
-        if (!isValidFriendCode(code) || code === PartyFriends.getOwnCode()) {
-          this.textDialog.statusMessage = friendError(
-            isValidFriendCode(code) ? "own_code" : "invalid_code"
-          );
+        // The friend's own app answers with their name; no need to type one.
+        const error = PartyFriends.add(value);
+        if (error) {
+          this.textDialog.statusMessage = friendError(error);
           this.render();
           return false;
         }
-        // The code dialog closes after this returns, so open the name step next tick.
-        setTimeout(() => {
-          this.openTextDialog({
-            title: t("party_friend_add_name", [], "Friend's name"),
-            value: PartyFriends.findByCode(code)?.name || "",
-            returnFocusKey: "watchParty:addFriend",
-            onSubmit: (name) => {
-              const error = PartyFriends.add(code, name);
-              if (error) {
-                this.textDialog.statusMessage = friendError(error);
-                this.render();
-                return false;
-              }
-              return true;
-            }
-          });
-          this.render();
-        }, 0);
         return true;
       }
     });
   });
   friends.forEach((friend) => {
+    const name = friendDisplayName(friend);
     this.actionMap.set(`watchParty:friend:${friend.code}`, () => {
       showConfirmDialog({
-        title: t("party_friend_remove_title", [friend.name], `Remove ${friend.name}?`),
+        title: t("party_friend_remove_title", [name], `Remove ${name}?`),
         message: t(
           "party_friend_remove_message",
           [],
-          "They keep your friend code, so they can still send you invites."
+          "You are removed from their friends as well."
         ),
         confirmLabel: t("party_remove"),
         onConfirm: () => {
@@ -87,39 +79,65 @@ function registerFriendActions(friends) {
 }
 
 function renderFriendRows(friends) {
-  return `
-      ${this.renderActionRow({
-        focusKey: "watchParty:friendCode",
-        title: t("party_friend_own_code", [], "Your friend code"),
-        subtitle: t(
-          "party_friend_own_code_sub",
-          [],
-          "Share it so friends can invite you to their watch party."
-        ),
-        value: formatFriendCode(PartyFriends.getOwnCode()),
-        leadingIcon: "badge"
-      })}
-      ${friends
+  this.ensureExpandedState("watchParty");
+  const expanded = Boolean(this.expandedSections.watchParty?.friends);
+  const friendList = friends.length
+    ? friends
         .map((friend) =>
           this.renderActionRow({
             focusKey: `watchParty:friend:${friend.code}`,
-            title: friend.name,
-            subtitle: formatFriendCode(friend.code),
+            title: friendDisplayName(friend),
+            subtitle: friend.name
+              ? formatFriendCode(friend.code)
+              : t("party_friend_name_pending", [], "Waiting for their name"),
             value: t("party_remove"),
             leadingIcon: "person"
           })
         )
-        .join("")}
-      ${this.renderActionRow({
-        focusKey: "watchParty:addFriend",
-        title: t("party_friend_add", [], "Add friend"),
-        subtitle: t(
-          "party_friend_add_sub",
-          [],
-          "Enter their friend code to invite them from a watch party."
-        ),
-        leadingIcon: "person_add"
-      })}`;
+        .join("")
+    : `<p class="settings-row-subtitle">${escapeHtml(
+        t("party_friend_none", [], "Add friends to invite them from a watch party.")
+      )}</p>`;
+  return `
+      <div class="settings-group-heading">
+        <div class="settings-group-title">${escapeHtml(t("party_friends_heading", [], "Friends"))}</div>
+      </div>
+      <div class="settings-group-card">
+        <div class="settings-stack">
+          ${this.renderActionRow({
+            focusKey: "watchParty:friendCode",
+            title: t("party_friend_own_code", [], "Your friend code"),
+            subtitle: t(
+              "party_friend_own_code_sub",
+              [],
+              "Share it so friends can invite you to their watch party."
+            ),
+            value: formatFriendCode(PartyFriends.getOwnCode()),
+            leadingIcon: "badge"
+          })}
+          ${this.renderActionRow({
+            focusKey: "watchParty:addFriend",
+            title: t("party_friend_add", [], "Add friend"),
+            subtitle: t(
+              "party_friend_add_sub",
+              [],
+              "Enter their friend code to invite them from a watch party."
+            ),
+            leadingIcon: "person_add"
+          })}
+          ${this.renderCollapsibleRow({
+            focusKey: "watchParty:toggle:friends",
+            title: t("party_friends_list", [friends.length], `Your friends (${friends.length})`),
+            subtitle: t(
+              "party_friends_list_sub",
+              [],
+              "Everyone you can invite. Select a friend to remove them."
+            ),
+            expanded,
+            bodyHtml: `<div class="settings-stack">${friendList}</div>`
+          })}
+        </div>
+      </div>`;
 }
 
 export function renderWatchPartySection() {
@@ -146,7 +164,8 @@ export function renderWatchPartySection() {
   return `
       ${this.renderSectionHeader(SECTION_META.find((item) => item.id === "watchParty"))}
       <div class="settings-group-card">
-        <div class="settings-stack">${row}${renderFriendRows.call(this, friends)}</div>
+        <div class="settings-stack">${row}</div>
       </div>
+      ${renderFriendRows.call(this, friends)}
     `;
 }
