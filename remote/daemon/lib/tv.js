@@ -4,6 +4,7 @@
 
 var childProcess = require("child_process");
 var execFile = childProcess.execFile;
+var os = require("os");
 
 var LUNA_TIMEOUT_MS = 5000;
 var SUBSCRIPTION_RETRY_MS = 5000;
@@ -160,6 +161,27 @@ function readVolume(result) {
   return { level: level == null ? null : Number(level), muted: muted == null ? null : !!muted };
 }
 
+// MAC of the LAN interface (Ethernet before Wi-Fi), for Wake-on-LAN from the phone.
+function lanMac(interfaces) {
+  var names = Object.keys(interfaces).sort(function (a, b) {
+    return (/^eth/.test(b) ? 1 : 0) - (/^eth/.test(a) ? 1 : 0);
+  });
+  for (var i = 0; i < names.length; i++) {
+    var entries = interfaces[names[i]] || [];
+    for (var j = 0; j < entries.length; j++) {
+      var entry = entries[j];
+      if (
+        !entry.internal &&
+        entry.family === "IPv4" &&
+        entry.mac &&
+        entry.mac !== "00:00:00:00:00:00"
+      )
+        return entry.mac;
+    }
+  }
+  return null;
+}
+
 function createTv(options) {
   var call = options.call || createLunaCaller(options);
   var subscribe = options.subscribe || createLunaSubscriber(options);
@@ -203,7 +225,8 @@ function createTv(options) {
       var settings = (results[0] && results[0].settings) || {};
       return {
         name: settings.deviceName || null,
-        model: results[1] && results[1].modelName ? results[1].modelName : null
+        model: results[1] && results[1].modelName ? results[1].modelName : null,
+        mac: lanMac(os.networkInterfaces())
       };
     });
   }
@@ -296,5 +319,6 @@ module.exports = {
   createLunaCaller: createLunaCaller,
   createLunaSubscriber: createLunaSubscriber,
   isPoweredOn: isPoweredOn,
+  lanMac: lanMac,
   readVolume: readVolume
 };

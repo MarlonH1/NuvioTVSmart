@@ -506,6 +506,44 @@ test("switching the TV off or to another input stops reporting playing", async (
   }
 });
 
+test("play while the TV is off waits until it is woken", async () => {
+  const env = await setup();
+  try {
+    const { phone } = await pairPhone(env);
+    const app = await env.connect("/app");
+    app.send({ type: "app.hello", version: "test" });
+    env.tv.presence({ poweredOn: false, foregroundAppId: "com.marlon.nuvio" });
+    phone.send({
+      type: "play",
+      request: { media: { title: "The Bear" }, stream: { url: "https://x/1.mkv" } }
+    });
+    await phone.next("state", (m) => m.playback.status === "loading");
+    assert.ok(!env.tv.calls.includes("launch"));
+    assert.strictEqual(env.hub.status().pendingPlay, true);
+
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.marlon.nuvio" });
+    assert.strictEqual((await app.next("play")).request.stream.url, "https://x/1.mkv");
+    assert.ok(env.tv.calls.includes("launch"));
+  } finally {
+    env.teardown();
+  }
+});
+
+test("lanMac prefers Ethernet and skips loopback", () => {
+  const { lanMac } = require("../lib/tv");
+  const v4 = (mac, internal) => [{ family: "IPv4", internal: !!internal, mac }];
+  assert.strictEqual(
+    lanMac({
+      lo: v4("00:00:00:00:00:00", true),
+      wlan0: v4("aa:aa:aa:aa:aa:aa"),
+      eth0: v4("bb:bb:bb:bb:bb:bb")
+    }),
+    "bb:bb:bb:bb:bb:bb"
+  );
+  assert.strictEqual(lanMac({ wlan0: v4("aa:aa:aa:aa:aa:aa") }), "aa:aa:aa:aa:aa:aa");
+  assert.strictEqual(lanMac({ lo: v4("00:00:00:00:00:00", true) }), null);
+});
+
 test("an app that stops reporting while playing is marked paused", async () => {
   const env = await setup({ staleAppMs: 150, staleCheckMs: 50 });
   try {

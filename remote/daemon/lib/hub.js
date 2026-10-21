@@ -104,6 +104,7 @@ function createHub(deps) {
   tv.info().then(function (info) {
     if (info.name) tvInfo.name = info.name;
     if (info.model) tvInfo.model = info.model;
+    if (info.mac) tvInfo.mac = info.mac;
     log("tv: " + tvInfo.name + (tvInfo.model ? " (" + tvInfo.model + ")" : ""));
   });
 
@@ -184,7 +185,17 @@ function createHub(deps) {
 
   function setPresence(next) {
     var wasVisible = appVisible();
+    var wasOff = presence.poweredOn === false;
     presence = { poweredOn: next.poweredOn, foregroundAppId: next.foregroundAppId };
+    // Woken (the phone sends Wake-on-LAN with play): now the held play can start Nuvio.
+    if (wasOff && presence.poweredOn !== false && pendingPlay) {
+      log("tv: powered on, starting held play");
+      launchNuvio();
+      if (app) {
+        send(app, { type: "play", request: pendingPlay });
+        clearPending();
+      }
+    }
     var visible = appVisible();
     if (wasVisible === visible) return;
     if (visible) {
@@ -325,11 +336,11 @@ function createHub(deps) {
     if (!request.request || !request.request.stream || !request.request.stream.url) {
       return { type: "error", code: "bad_request", message: "play needs request.stream.url" };
     }
-    // Launching a running app just brings it to the front (webOSRelaunch).
-    tv.launchApp().then(function (result) {
-      if (!result.ok) log("launch failed: " + result.error);
-    });
-    if (app) {
+    // In standby a launch does nothing: hold the request until the TV is on (setPresence).
+    var asleep = presence.poweredOn === false;
+    if (asleep) log("tv: off, holding play until it is woken");
+    else launchNuvio();
+    if (app && !asleep) {
       send(app, { type: "play", request: request.request });
     } else {
       clearPending();
@@ -351,6 +362,13 @@ function createHub(deps) {
     loading.media = media || null;
     setPlayback(loading);
     return null;
+  }
+
+  // Launching a running app just brings it to the front (webOSRelaunch).
+  function launchNuvio() {
+    tv.launchApp().then(function (result) {
+      if (!result.ok) log("launch failed: " + result.error);
+    });
   }
 
   function command(request) {
