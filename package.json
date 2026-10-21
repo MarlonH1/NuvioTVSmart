@@ -21,6 +21,7 @@
     "package:tizen": "npm run build && node ./scripts/package-tizen.mjs",
     "package:tizen:store": "npm run build && node ./scripts/package-tizen.mjs --store",
     "package:webos": "npm run build && node ./scripts/package-webos.mjs",
+    "publish:webos-homebrew": "node ./scripts/publish-webos-homebrew.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "serve": "node ./scripts/serve.mjs",
