@@ -1,0 +1,32 @@
+{
+  "paging": {
+    "page": 1,
+    "count": 1,
+    "maxPage": 1,
+    "itemsTotal": 1
+  },
+  "packages": [
+    {
+      "id": "com.marlon.nuvio",
+      "title": "Nuvio TV (Marlon)",
+      "iconUri": "https://raw.githubusercontent.com/MarlonH1/NuvioTVSmart/webosbrew/icon.png",
+      "manifest": {
+        "id": "com.marlon.nuvio",
+        "version": "1.2.9",
+        "type": "web",
+        "title": "Nuvio TV (Marlon)",
+        "appDescription": "Nuvio TV fork with Nuvio Remote support.",
+        "iconUri": "https://raw.githubusercontent.com/MarlonH1/NuvioTVSmart/webosbrew/icon.png",
+        "sourceUrl": "https://github.com/MarlonH1/NuvioTVSmart",
+        "rootRequired": false,
+        "ipkUrl": "https://github.com/MarlonH1/NuvioTVSmart/releases/download/webos-v1.2.9/NuvioTV-webOS-1.2.9.ipk",
+        "ipkHash": {
+          "sha256": "132e80df93d60f8a27bdfa2f1700ccc95963194e79a0d7d8a68fbcd123aa3eb8"
+        },
+        "ipkSize": 7745072
+      },
+      "pool": "main",
+      "shortDescription": "Nuvio TV fork with Nuvio Remote support."
+    }
+  ]
+}
