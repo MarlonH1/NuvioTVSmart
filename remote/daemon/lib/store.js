@@ -1,4 +1,5 @@
-// Small JSON file store: the TV's stable id and the tokens of paired phones.
+// Small JSON file store: the TV's stable id, the tokens of paired phones and the apps opened
+// most recently (webOS keeps no launch history the daemon can read).
 "use strict";
 
 var fs = require("fs");
@@ -6,7 +7,7 @@ var path = require("path");
 var crypto = require("crypto");
 
 function createStore(file, log) {
-  var data = { tvId: null, tokens: {} };
+  var data = { tvId: null, tokens: {}, recentApps: [] };
   try {
     data = Object.assign(data, JSON.parse(fs.readFileSync(file, "utf8")));
   } catch (error) {
@@ -52,6 +53,21 @@ function createStore(file, log) {
     removeToken: function (token) {
       delete data.tokens[token];
       save();
+    },
+    /** Remembers that an app came to the front; newest first, at most 30. */
+    noteAppOpened: function (appId, now) {
+      if (!appId) return;
+      var recent = (Array.isArray(data.recentApps) ? data.recentApps : []).filter(function (entry) {
+        return entry && entry.id !== appId;
+      });
+      recent.unshift({ id: appId, at: now });
+      data.recentApps = recent.slice(0, 30);
+      save();
+    },
+    recentAppIds: function () {
+      return (Array.isArray(data.recentApps) ? data.recentApps : []).map(function (entry) {
+        return entry.id;
+      });
     },
     listTokens: function () {
       return Object.keys(data.tokens).map(function (token) {

@@ -379,19 +379,24 @@ function createTv(options) {
     });
   }
 
-  /** Apps a user would open from the home screen. */
+  /** The apps on the home screen, with the absolute path of each icon on the TV. */
   function listApps() {
-    return call("luna://com.webos.applicationManager/listApps", {}).then(function (result) {
-      var apps = Array.isArray(result.apps) ? result.apps : [];
-      return apps
-        .filter(function (app) {
-          return app && app.id && app.visible !== false && app.title;
+    return call("luna://com.webos.applicationManager/listLaunchPoints", {}).then(function (result) {
+      var points = Array.isArray(result.launchPoints) ? result.launchPoints : [];
+      var seen = {};
+      return points
+        .filter(function (point) {
+          if (!point || !point.id || !point.title || point.hidden || seen[point.id]) return false;
+          seen[point.id] = true;
+          return true;
         })
-        .map(function (app) {
-          return { id: String(app.id), title: String(app.title) };
-        })
-        .sort(function (a, b) {
-          return a.title.localeCompare(b.title);
+        .map(function (point) {
+          var icon = String(point.icon || point.largeIcon || "");
+          return {
+            id: String(point.id),
+            title: String(point.title),
+            iconPath: icon.charAt(0) === "/" ? icon : null
+          };
         });
     });
   }

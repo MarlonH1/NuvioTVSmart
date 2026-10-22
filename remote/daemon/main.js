@@ -68,6 +68,10 @@ var server = http.createServer(function (req, res) {
     hub.handleWatch(req, res);
     return;
   }
+  if (String(req.url || "").indexOf("/apps/icon") === 0) {
+    hub.handleAppIcon(req, res);
+    return;
+  }
   // GET / is a reachability check that works from any browser on the LAN.
   res.writeHead(200, {
     "Content-Type": "application/json; charset=utf-8",

@@ -88,6 +88,7 @@ function isLoopback(address) {
  * @param deps.staleAppMs, deps.staleCheckMs  optional watchdog timings, for tests
  */
 function createHub(deps) {
+  var readFile = (deps && deps.readFile) || require("fs").readFile;
   var tv = deps.tv;
   var store = deps.store;
   var log = deps.log || function () {};
@@ -200,7 +201,11 @@ function createHub(deps) {
   function setPresence(next) {
     var wasVisible = appVisible();
     var wasOff = presence.poweredOn === false;
+    var previousApp = presence.foregroundAppId;
     presence = { poweredOn: next.poweredOn, foregroundAppId: next.foregroundAppId };
+    if (presence.foregroundAppId && presence.foregroundAppId !== previousApp) {
+      store.noteAppOpened(presence.foregroundAppId, now());
+    }
     // Woken (the phone sends Wake-on-LAN with play): now the held play can start Nuvio.
     if (wasOff && presence.poweredOn !== false && pendingPlay) {
       log("tv: powered on, starting held play");
@@ -244,6 +249,72 @@ function createHub(deps) {
     playback = next;
     broadcast({ type: "state", playback: playback });
     if (wasActive !== isActive(playback)) notifyWatchers();
+  }
+
+  // Icon files of the last app list, by app id; only these paths are ever served.
+  var appIcons = {};
+
+  /** Most recently opened first, the rest by title; icons via handleAppIcon. */
+  function describeApps(apps) {
+    var recent = store.recentAppIds();
+    appIcons = {};
+    apps.forEach(function (app) {
+      if (app.iconPath) appIcons[app.id] = app.iconPath;
+    });
+    return apps
+      .slice()
+      .sort(function (a, b) {
+        var ra = recent.indexOf(a.id);
+        var rb = recent.indexOf(b.id);
+        if (ra !== rb) return (ra < 0 ? Infinity : ra) - (rb < 0 ? Infinity : rb) || 0;
+        return a.title.localeCompare(b.title);
+      })
+      .map(function (app) {
+        return {
+          id: app.id,
+          title: app.title,
+          icon: app.iconPath ? "/apps/icon?id=" + encodeURIComponent(app.id) : null
+        };
+      });
+  }
+
+  function queryParams(req) {
+    var params = {};
+    (String(req.url || "").split("?")[1] || "").split("&").forEach(function (pair) {
+      var parts = pair.split("=");
+      if (parts[0]) params[parts[0]] = decodeURIComponent(parts[1] || "");
+    });
+    return params;
+  }
+
+  /** GET /apps/icon?id=…&token=…: an app icon for paired phones. */
+  function handleAppIcon(req, res) {
+    var params = queryParams(req);
+    if (!params.token || !store.hasToken(params.token)) {
+      res.writeHead(401, { "Content-Type": "text/plain" });
+      res.end("not paired\n");
+      return;
+    }
+    var file = appIcons[params.id];
+    if (!file) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("unknown app\n");
+      return;
+    }
+    readFile(file, function (error, data) {
+      if (error) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("no icon\n");
+        return;
+      }
+      var type = /\.jpe?g$/i.test(file)
+        ? "image/jpeg"
+        : /\.svg$/i.test(file)
+          ? "image/svg+xml"
+          : "image/png";
+      res.writeHead(200, { "Content-Type": type, "Cache-Control": "max-age=86400" });
+      res.end(data);
+    });
   }
 
   function handleWatch(req, res) {
@@ -600,7 +671,7 @@ function createHub(deps) {
         return;
       case "apps.get":
         tv.listApps().then(function (apps) {
-          reply(phone, request, { type: "apps", apps: apps });
+          reply(phone, request, { type: "apps", apps: describeApps(apps) });
         });
         return;
       default:
@@ -703,6 +774,7 @@ function createHub(deps) {
   return {
     handleConnection: handleConnection,
     handleWatch: handleWatch,
+    handleAppIcon: handleAppIcon,
     status: function () {
       return {
         tv: tvInfo,

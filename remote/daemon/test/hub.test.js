@@ -93,7 +93,11 @@ function fakeTv() {
       return Promise.resolve({ ok: true });
     },
     listApps() {
-      return Promise.resolve([{ id: "netflix", title: "Netflix" }]);
+      return Promise.resolve([
+        { id: "netflix", title: "Netflix", iconPath: "/apps/netflix/icon.png" },
+        { id: "youtube.leanback.v4", title: "YouTube", iconPath: "/apps/youtube/icon.png" },
+        { id: "com.webos.app.hdmi1", title: "HDMI 1", iconPath: null }
+      ]);
     },
     showCode(code) {
       calls.push("showCode");
@@ -581,7 +585,41 @@ test("paired phones press remote keys, open screens and list apps", async () => 
     phone.send({ type: "key", key: "nope", id: "k" });
     assert.strictEqual((await phone.next("error")).code, "key_failed");
     phone.send({ type: "apps.get", id: "a" });
-    assert.deepStrictEqual((await phone.next("apps")).apps, [{ id: "netflix", title: "Netflix" }]);
+    const apps = (await phone.next("apps")).apps;
+    assert.deepStrictEqual(apps[0], { id: "com.webos.app.hdmi1", title: "HDMI 1", icon: null });
+    assert.strictEqual(apps[1].icon, "/apps/icon?id=netflix");
+  } finally {
+    env.teardown();
+  }
+});
+
+test("apps are listed most recently opened first and icons need a token", async () => {
+  const env = await setup();
+  try {
+    const { phone, token } = await pairPhone(env);
+    env.tv.presence({ poweredOn: true, foregroundAppId: "netflix" });
+    env.tv.presence({ poweredOn: true, foregroundAppId: "youtube.leanback.v4" });
+    phone.send({ type: "apps.get" });
+    const apps = (await phone.next("apps")).apps.map((app) => app.id);
+    assert.deepStrictEqual(apps, ["youtube.leanback.v4", "netflix", "com.webos.app.hdmi1"]);
+
+    const fakeRes = () => {
+      const res = { headers: null, status: 0, body: null };
+      res.writeHead = (status, headers) => {
+        res.status = status;
+        res.headers = headers;
+      };
+      res.end = (body) => {
+        res.body = body;
+      };
+      return res;
+    };
+    const noToken = fakeRes();
+    env.hub.handleAppIcon({ url: "/apps/icon?id=netflix" }, noToken);
+    assert.strictEqual(noToken.status, 401);
+    const unknown = fakeRes();
+    env.hub.handleAppIcon({ url: "/apps/icon?id=evil&token=" + token }, unknown);
+    assert.strictEqual(unknown.status, 404);
   } finally {
     env.teardown();
   }
