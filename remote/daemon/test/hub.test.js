@@ -529,6 +529,35 @@ test("play while the TV is off waits until it is woken", async () => {
   }
 });
 
+test("an input that takes over right after a play launch brings Nuvio back, twice at most", async () => {
+  const env = await setup();
+  try {
+    const { phone } = await pairPhone(env);
+    const app = await env.connect("/app");
+    app.send({ type: "app.hello", version: "test" });
+    // Fresh boot: the TV resumes its last input before the phone's play arrives.
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.webos.app.hdmi2" });
+    phone.send({
+      type: "play",
+      request: { media: { title: "Frieren" }, stream: { url: "https://x/2.mkv" } }
+    });
+    await app.next("play");
+    const launches = () => env.tv.calls.filter((call) => call === "launch").length;
+    assert.strictEqual(launches(), 1);
+
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.marlon.nuvio" });
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.webos.app.hdmi2" });
+    assert.strictEqual(launches(), 2, "input takeover relaunches Nuvio");
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.marlon.nuvio" });
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.webos.app.hdmi2" });
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.marlon.nuvio" });
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.webos.app.hdmi2" });
+    assert.strictEqual(launches(), 3, "gives up after two relaunches");
+  } finally {
+    env.teardown();
+  }
+});
+
 test("lanMac prefers Ethernet and skips loopback", () => {
   const { lanMac } = require("../lib/tv");
   const v4 = (mac, internal) => [{ family: "IPv4", internal: !!internal, mac }];

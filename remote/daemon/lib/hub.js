@@ -32,6 +32,8 @@ var STALE_CHECK_MS = 5000;
 var WATCH_KEEPALIVE_MS = 600000;
 var ACTIVE_STATUSES = { loading: true, playing: true, paused: true, buffering: true };
 var MAX_CODE_ATTEMPTS = 5;
+var CLAIM_FOREGROUND_MS = 30000;
+var MAX_CLAIM_RELAUNCHES = 2;
 // The app answers an invite after one ntfy.sh POST (10 s timeout there).
 var INVITE_TIMEOUT_MS = 15000;
 var UNPAIRED_TYPES = { hello: true, "pair.begin": true, "pair.confirm": true, ping: true };
@@ -100,6 +102,10 @@ function createHub(deps) {
   var nextInviteId = 1;
   var volume = { level: null, muted: false };
   var pendingPlay = null;
+  // After launching Nuvio for a play, LG can still switch to the last input (e.g. HDMI while
+  // it finishes waking up). Within this window such a takeover brings Nuvio back.
+  var claimUntil = 0;
+  var claimRelaunches = 0;
   var pendingTimer = null;
   var tvInfo = { id: store.tvId(), name: "LG TV", model: null, platform: "webos" };
   var configuredAppId = deps.appId || null;
@@ -198,12 +204,24 @@ function createHub(deps) {
     if (wasOff && presence.poweredOn !== false && pendingPlay) {
       log("tv: powered on, starting held play");
       launchNuvio();
+      claimForeground();
       if (app) {
         send(app, { type: "play", request: pendingPlay });
         clearPending();
       }
     }
     var visible = appVisible();
+    if (
+      !visible &&
+      presence.poweredOn !== false &&
+      presence.foregroundAppId &&
+      now() < claimUntil &&
+      claimRelaunches < MAX_CLAIM_RELAUNCHES
+    ) {
+      claimRelaunches += 1;
+      log("tv: " + presence.foregroundAppId + " took over after the launch, bringing Nuvio back");
+      launchNuvio();
+    }
     if (wasVisible === visible) return;
     if (visible) {
       log("tv: nuvio in front");
@@ -400,8 +418,20 @@ function createHub(deps) {
     }
     // In standby a launch does nothing: hold the request until the TV is on (setPresence).
     var asleep = presence.poweredOn === false;
+    log(
+      "play: " +
+        ((media && media.title) || "untitled") +
+        " (tv " +
+        (asleep ? "off" : "on, front " + (presence.foregroundAppId || "unknown")) +
+        ", app " +
+        (app ? "connected" : "not connected") +
+        ")"
+    );
     if (asleep) log("tv: off, holding play until it is woken");
-    else launchNuvio();
+    else {
+      launchNuvio();
+      claimForeground();
+    }
     if (app && !asleep) {
       send(app, { type: "play", request: request.request });
     } else {
@@ -424,6 +454,11 @@ function createHub(deps) {
     loading.media = media || null;
     setPlayback(loading);
     return null;
+  }
+
+  function claimForeground() {
+    claimUntil = now() + CLAIM_FOREGROUND_MS;
+    claimRelaunches = 0;
   }
 
   // Launching a running app just brings it to the front (webOSRelaunch).
