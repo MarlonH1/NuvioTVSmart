@@ -400,6 +400,22 @@ try {
   await phone.next("state", (m) => m.playback.status === "idle");
   assert.equal(bridge.isNuvioRemoteConnected(), false);
   phone.socket.close();
+  // Phone subtitle settings are limited to the TV dialog's fields and ranges.
+  assert.deepEqual(
+    bridge.sanitizeRemoteSubtitleStyle({
+      fontSize: 247,
+      textColor: "#ffd700",
+      outlineColor: "#123456",
+      textOpacity: 33,
+      verticalOffset: -99,
+      bold: true,
+      evil: "<script>"
+    }),
+    { fontSize: 200, textOpacity: 30, verticalOffset: -20, bold: true, textColor: "#FFD700" }
+  );
+  assert.deepEqual(bridge.sanitizeRemoteSubtitleStyle(null), {});
+  assert.deepEqual(bridge.sanitizeRemoteSubtitleStyle({ fontSize: null, textOpacity: "40" }), {});
+
   console.log("nuvio remote bridge: ok");
 } finally {
   bridge.stopNuvioRemoteBridge();

@@ -7,6 +7,7 @@
 import { LocalStore } from "../storage/localStore.js";
 import { Router } from "../../ui/navigation/routerState.js";
 import { PlayerController } from "../player/playerController.js";
+import { PlayerSettingsStore } from "../../data/local/playerSettingsStore.js";
 import { findFollowingPostCreditsScene } from "../player/skipIntervalRules.js";
 import { showRemotePairingCode, hideRemotePairingCode } from "./nuvioRemotePairingOverlay.js";
 
@@ -398,8 +399,74 @@ function findSubtitleEntry(player, trackId) {
   return null;
 }
 
+// Phone subtitle settings: only known fields, clamped to what the TV's own dialog allows.
+const REMOTE_SUBTITLE_TEXT_COLORS = [
+  "#FFFFFF",
+  "#D9D9D9",
+  "#FFD700",
+  "#00E5FF",
+  "#FF5C5C",
+  "#00FF88"
+];
+const REMOTE_SUBTITLE_OUTLINE_COLORS = ["#000000", "#FFFFFF", "#00E5FF", "#FF5C5C"];
+
+export function sanitizeRemoteSubtitleStyle(input) {
+  const style = {};
+  if (!input || typeof input !== "object") return style;
+  const clampStep = (value, min, max, step) =>
+    Math.min(max, Math.max(min, Math.round(Number(value) / step) * step));
+  // Number(null) is 0, so only accept real numbers.
+  const isNumber = (value) => typeof value === "number" && Number.isFinite(value);
+  if (isNumber(input.fontSize)) style.fontSize = clampStep(input.fontSize, 50, 200, 10);
+  if (isNumber(input.textOpacity)) style.textOpacity = clampStep(input.textOpacity, 0, 100, 10);
+  if (isNumber(input.verticalOffset))
+    style.verticalOffset = clampStep(input.verticalOffset, -20, 50, 1);
+  if (typeof input.bold === "boolean") style.bold = input.bold;
+  if (typeof input.outlineEnabled === "boolean") style.outlineEnabled = input.outlineEnabled;
+  const textColor = String(input.textColor || "").toUpperCase();
+  if (REMOTE_SUBTITLE_TEXT_COLORS.includes(textColor)) style.textColor = textColor;
+  const outlineColor = String(input.outlineColor || "").toUpperCase();
+  if (REMOTE_SUBTITLE_OUTLINE_COLORS.includes(outlineColor)) style.outlineColor = outlineColor;
+  return style;
+}
+
+function currentSubtitleStyle(player) {
+  const style =
+    (player && player.subtitleStyleSettings) ||
+    safe(() => PlayerSettingsStore.get().subtitleStyle, {}) ||
+    {};
+  return {
+    fontSize: Number(style.fontSize) || 100,
+    textColor: String(style.textColor || "#FFFFFF").toUpperCase(),
+    textOpacity: Number(style.textOpacity ?? 100),
+    bold: Boolean(style.bold),
+    outlineEnabled: style.outlineEnabled !== false,
+    outlineColor: String(style.outlineColor || "#000000").toUpperCase(),
+    verticalOffset: Number(style.verticalOffset ?? 5)
+  };
+}
+
+function applyRemoteSubtitleStyle(player, input) {
+  const style = sanitizeRemoteSubtitleStyle(input);
+  if (!Object.keys(style).length) return;
+  if (!player) {
+    // Nothing playing: save it so the next playback uses it.
+    PlayerSettingsStore.set({ subtitleStyle: style });
+    return;
+  }
+  // Same path as the TV's subtitle style dialog: live update, then persisted.
+  player.subtitleStyleSettings = { ...(player.subtitleStyleSettings || {}), ...style };
+  safe(() => player.schedulePersistPlayerPresentationSettings());
+  safe(() => player.applySubtitlePresentationSettings({ refreshTrackRendering: true }));
+}
+
 async function runCommand(message) {
   const player = currentPlayer();
+  if (message.action === "subtitleStyle") {
+    applyRemoteSubtitleStyle(player, message.style);
+    setTimeout(() => pushStateIfChanged(true), 250);
+    return;
+  }
   if (!player) {
     pushStateIfChanged(true);
     return;
@@ -596,6 +663,7 @@ export function readPlaybackState(player) {
     audioTracks,
     subtitleTracks,
     subtitleDelayMs: Number(player.subtitleDelayMs) || 0,
+    subtitleStyle: currentSubtitleStyle(player),
     hasNext: Boolean(safe(() => player.resolveNextEpisodeInfo(), null)),
     skip: readSkip(player),
     error: status === "error" ? "Playback failed" : null

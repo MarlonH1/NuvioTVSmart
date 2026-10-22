@@ -49,7 +49,8 @@ var COMMANDS = {
   subtitle: true,
   subtitleDelay: true,
   skip: true,
-  speed: true
+  speed: true,
+  subtitleStyle: true
 };
 
 function randomCode() {
@@ -487,7 +488,8 @@ function createHub(deps) {
       deltaMs: request.deltaMs,
       trackId: request.trackId,
       delayMs: request.delayMs,
-      rate: request.rate
+      rate: request.rate,
+      style: request.style && typeof request.style === "object" ? request.style : undefined
     });
     return null;
   }
@@ -580,6 +582,26 @@ function createHub(deps) {
         break;
       case "volume":
         changeVolume(phone, request);
+        return;
+      // Full TV remote: buttons, system screens and the app list.
+      case "key":
+        tv.pressKey(String(request.key || "")).then(function (result) {
+          if (!result.ok) {
+            reply(phone, request, { type: "error", code: "key_failed", message: result.error });
+          }
+        });
+        return;
+      case "launch":
+        tv.launchTarget(String(request.target || "")).then(function (result) {
+          if (!result.ok) {
+            reply(phone, request, { type: "error", code: "launch_failed", message: result.error });
+          }
+        });
+        return;
+      case "apps.get":
+        tv.listApps().then(function (apps) {
+          reply(phone, request, { type: "apps", apps: apps });
+        });
         return;
       default:
         response = { type: "error", code: "unknown_type", message: type };

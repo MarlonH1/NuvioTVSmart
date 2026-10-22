@@ -82,6 +82,19 @@ function fakeTv() {
       calls.push("launch");
       return Promise.resolve({ ok: true });
     },
+    pressKey(name) {
+      calls.push("key:" + name);
+      return Promise.resolve(
+        name === "nope" ? { ok: false, error: "unknown key nope" } : { ok: true }
+      );
+    },
+    launchTarget(target) {
+      calls.push("target:" + target);
+      return Promise.resolve({ ok: true });
+    },
+    listApps() {
+      return Promise.resolve([{ id: "netflix", title: "Netflix" }]);
+    },
     showCode(code) {
       calls.push("showCode");
       this.code = code;
@@ -556,6 +569,77 @@ test("an input that takes over right after a play launch brings Nuvio back, twic
   } finally {
     env.teardown();
   }
+});
+
+test("paired phones press remote keys, open screens and list apps", async () => {
+  const env = await setup();
+  try {
+    const { phone } = await pairPhone(env);
+    phone.send({ type: "key", key: "down" });
+    phone.send({ type: "launch", target: "hdmi2" });
+    await waitFor(() => env.tv.calls.includes("key:down") && env.tv.calls.includes("target:hdmi2"));
+    phone.send({ type: "key", key: "nope", id: "k" });
+    assert.strictEqual((await phone.next("error")).code, "key_failed");
+    phone.send({ type: "apps.get", id: "a" });
+    assert.deepStrictEqual((await phone.next("apps")).apps, [{ id: "netflix", title: "Netflix" }]);
+  } finally {
+    env.teardown();
+  }
+});
+
+test("unpaired phones cannot press keys", async () => {
+  const env = await setup();
+  try {
+    const phone = await env.connect("/ws");
+    phone.send({ type: "hello", client: { id: "x", name: "X", platform: "android" } });
+    await phone.next("welcome");
+    phone.send({ type: "key", key: "power" });
+    assert.strictEqual((await phone.next("error")).code, "not_paired");
+    assert.ok(!env.tv.calls.some((call) => call.startsWith("key:")));
+  } finally {
+    env.teardown();
+  }
+});
+
+test("remote key device lookup and input_event layout", () => {
+  const { remoteDevicePath, inputEvent, createTv, REMOTE_KEYS } = require("../lib/tv");
+  const devices = [
+    'I: Bus=0000\nN: Name="Bluetooth-audio-source"\nH: Handlers=event2',
+    'I: Bus=0000\nN: Name="LGE RCU"\nH: Handlers=kbd event7 \nB: EV=7'
+  ].join("\n\n");
+  assert.strictEqual(remoteDevicePath(devices), "/dev/input/event7");
+  assert.strictEqual(remoteDevicePath("nothing"), null);
+
+  const wide = inputEvent(1, 28, 1, true);
+  assert.strictEqual(wide.length, 24);
+  assert.strictEqual(wide.readUInt16LE(16), 1);
+  assert.strictEqual(wide.readUInt16LE(18), 28);
+  assert.strictEqual(wide.readInt32LE(20), 1);
+  assert.strictEqual(inputEvent(1, 28, 1, false).length, 16);
+  assert.strictEqual(REMOTE_KEYS.ok, 28);
+  assert.strictEqual(REMOTE_KEYS.back, 412);
+
+  const written = [];
+  const tv = createTv({
+    call: () => Promise.resolve({}),
+    subscribe: () => () => {},
+    writeKey: (b) => written.push(b)
+  });
+  return tv.pressKey("left").then((result) => {
+    assert.ok(result.ok);
+    const codes = written.map((b) => [
+      b.readUInt16LE(b.length - 8),
+      b.readUInt16LE(b.length - 6),
+      b.readInt32LE(b.length - 4)
+    ]);
+    assert.deepStrictEqual(codes, [
+      [1, 105, 1],
+      [0, 0, 0],
+      [1, 105, 0],
+      [0, 0, 0]
+    ]);
+    return tv.pressKey("bogus").then((bad) => assert.strictEqual(bad.ok, false));
+  });
 });
 
 test("lanMac prefers Ethernet and skips loopback", () => {
