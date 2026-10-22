@@ -350,6 +350,8 @@ export const PlayerController = {
   avplayDisplayMethod: "PLAYER_DISPLAY_MODE_FULL_SCREEN",
   startupAudioGateActive: false,
   startupAudioGatePausesNativePlayback: true,
+  // The user paused while the startup gate was active; releasing the gate must not resume.
+  startupUserPaused: false,
   startupPresentationAudioMuted: false,
   desiredPlaybackRate: 1,
   appliedAvPlayPlaybackRate: 1,

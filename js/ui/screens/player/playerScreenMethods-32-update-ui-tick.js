@@ -3,6 +3,8 @@ import { MediaServerScrobbleService } from "../../../data/mediaserver/mediaServe
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
+const STARTUP_GATE_OVERLAY_GRACE_MS = 4000;
+
 export function createPlayerScreenMethods32() {
   const { PlayerController, deltaMsForKeyRepeat, calculateRemainingPlaybackMilliseconds, t, formatTime, formatClock, formatEndsAt, clamp } =
     internals;
@@ -19,6 +21,7 @@ export function createPlayerScreenMethods32() {
       if (PlayerController.startupPresentationAudioMuted && this.hasPresentedPlaybackFrame && !this.loadingVisible) {
         PlayerController.setStartupPresentationAudioMuted?.(false);
       }
+      this.settleStartupAudioGateAfterOverlay();
       this.maybeApplyAnimePlaybackSpeed();
       this.ensureNextEpisodeStreamsPrefetch();
       this.shouldShowNextEpisodeCard();
@@ -303,6 +306,30 @@ export function createPlayerScreenMethods32() {
       const wasPaused = this.getPlaybackControlPaused();
       this.togglePauseLocally({ focusControls, preserveProgressFocus });
       this.publishPartyPlayback?.({ paused: !wasPaused });
+    },
+    // The startup gate is otherwise only re-checked while the loading overlay is up. When the
+    // overlay goes first (e.g. an audio selection was still pending), playback continued muted
+    // until a seek or source change. Re-check here and give up waiting after a short grace.
+    settleStartupAudioGateAfterOverlay() {
+      if (!this.startupAudioGateActive || !this.hasPresentedPlaybackFrame || this.loadingVisible) {
+        this.startupGateOverlayGoneAt = 0;
+        return;
+      }
+      if (this.isStartupGateReleaseReady()) {
+        this.startupGateOverlayGoneAt = 0;
+        this.releaseStartupAudioGate({ resume: !this.paused });
+        return;
+      }
+      const now = Date.now();
+      if (!this.startupGateOverlayGoneAt) {
+        this.startupGateOverlayGoneAt = now;
+        return;
+      }
+      if (now - this.startupGateOverlayGoneAt >= STARTUP_GATE_OVERLAY_GRACE_MS) {
+        console.warn("[player] releasing startup audio gate left open after the loading overlay");
+        this.startupGateOverlayGoneAt = 0;
+        this.releaseStartupAudioGate({ resume: !this.paused });
+      }
     },
     togglePauseLocally({ focusControls = true, preserveProgressFocus = false } = {}) {
       if (this.getPlaybackControlPaused()) {

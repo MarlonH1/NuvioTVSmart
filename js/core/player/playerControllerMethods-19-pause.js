@@ -16,6 +16,7 @@ export function createPlayerControllerMethods19() {
         this.webOsDtsAudioState.resumePlayback = false;
         this.webOsDtsAudioState.controlPaused = true;
       }
+      if (this.startupAudioGateActive) this.startupUserPaused = true;
 
       this.stopProgressSaving();
       this.cancelProgressSyncAfterSeek();
@@ -55,7 +56,13 @@ export function createPlayerControllerMethods19() {
         this.startProgressSaving();
       }
       if (this.startupAudioGateActive) {
+        this.startupUserPaused = false;
         this.applyStartupAudioGateToVideo();
+        // When the gate lets native playback run (muted), it only releases once frames advance,
+        // so a resume after a startup pause has to restart the element itself.
+        if (!this.startupAudioGatePausesNativePlayback && !this.isUsingAvPlay() && this.video.paused) {
+          this.resumeNativePlaybackAfterStartupGate();
+        }
         return;
       }
 

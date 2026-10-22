@@ -105,6 +105,8 @@ export function createPlayerControllerMethods03() {
       const shouldGate = Boolean(active);
       const wasGated = Boolean(this.startupAudioGateActive);
       const nativePlaybackWasPausedForGate = Boolean(this.startupAudioGatePausesNativePlayback);
+      const userPaused = Boolean(this.startupUserPaused);
+      if (shouldGate !== wasGated) this.startupUserPaused = false;
       this.startupAudioGateActive = shouldGate;
       this.startupAudioGatePausesNativePlayback = shouldGate ? Boolean(pauseNativePlayback) : true;
       this.applyStartupAudioGateToVideo();
@@ -124,7 +126,7 @@ export function createPlayerControllerMethods03() {
         return;
       }
 
-      if (!resume || !wasGated) {
+      if (!resume || !wasGated || userPaused) {
         return;
       }
       if (this.isUsingAvPlay()) {

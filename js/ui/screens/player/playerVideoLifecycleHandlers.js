@@ -156,7 +156,7 @@ export function createPlayerVideoLifecycleHandlers(video, isTizenAvPlayPlayback)
 
   const onPause = () => {
     if (this.startupAudioGateActive) {
-      this.paused = false;
+      this.paused = Boolean(PlayerController.startupUserPaused);
       this.updateMediaSessionPlaybackState();
       return;
     }
