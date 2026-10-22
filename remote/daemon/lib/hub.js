@@ -1,8 +1,8 @@
 // Nuvio Remote hub: speaks protocol v1 (NuvioMobile docs/remote-protocol.md) with phones on
 // /ws and a small bridge protocol with the Nuvio TV app on /app (loopback only).
 //
-// The hub owns everything that must work while Nuvio is closed: pairing, tokens, volume and
-// launching the app. Playback commands are forwarded to the app; its state is fanned out to
+// The hub owns everything that must work while Nuvio is closed: pairing, tokens, launching the
+// app and handing out the TV API key. Playback commands are forwarded to the app; its state is fanned out to
 // every paired phone.
 //
 // webOS freezes Nuvio instead of closing it when the TV is switched off or another app/input
@@ -79,7 +79,7 @@ function isLoopback(address) {
 }
 
 /**
- * @param deps.tv      TV adapter (lib/tv.js): info(), volume(action), launchApp(), showCode(),
+ * @param deps.tv      TV adapter (lib/tv.js): info(), launchApp(), showCode(),
  *                     hideCode(), optional watchPresence(onChange)
  * @param deps.store   persistent store (lib/store.js)
  * @param deps.appId   webOS id of Nuvio; the id the app reports in app.hello takes precedence
@@ -104,7 +104,6 @@ function createHub(deps) {
   var party = null;
   var pendingInvites = {};
   var nextInviteId = 1;
-  var volume = { level: null, muted: false };
   var pendingPlay = null;
   // After launching Nuvio for a play, LG can still switch to the last input (e.g. HDMI while
   // it finishes waking up). Within this window such a takeover brings Nuvio back.
@@ -352,12 +351,6 @@ function createHub(deps) {
     });
   }
 
-  function sendVolume(target) {
-    var message = { type: "volume.state", level: volume.level, muted: volume.muted };
-    if (target) send(target.connection, message);
-    else broadcast(message);
-  }
-
   // ------------------------------------------------------------ pairing
 
   function activePairing() {
@@ -518,43 +511,6 @@ function createHub(deps) {
     return null;
   }
 
-  // One volume call at a time. While a slider is dragged, "set" requests pile up; only the
-  // newest one matters, so a waiting "set" is replaced instead of queued.
-  var volumeBusy = false;
-  var volumeQueue = [];
-
-  function changeVolume(phone, request) {
-    var action = String(request.action || "get");
-    if (action === "set") {
-      volumeQueue = volumeQueue.filter(function (item) {
-        return item.action !== "set";
-      });
-    }
-    volumeQueue.push({ phone: phone, request: request, action: action });
-    runVolumeQueue();
-  }
-
-  function runVolumeQueue() {
-    if (volumeBusy || !volumeQueue.length) return;
-    var item = volumeQueue.shift();
-    volumeBusy = true;
-    tv.volume(item.action, item.request.level).then(function (result) {
-      volumeBusy = false;
-      if (result.level != null) volume.level = result.level;
-      if (result.muted != null) volume.muted = result.muted;
-      if (!result.ok) {
-        reply(item.phone, item.request, {
-          type: "error",
-          code: "volume_failed",
-          message: result.error
-        });
-      }
-      // Intermediate levels of a drag are not worth broadcasting.
-      if (!volumeQueue.length) sendVolume(null);
-      runVolumeQueue();
-    });
-  }
-
   // ------------------------------------------------------------ connections
 
   function handlePhoneMessage(phone, request) {
@@ -576,7 +532,6 @@ function createHub(deps) {
         });
         if (phone.paired) {
           send(phone.connection, { type: "state", playback: playback });
-          sendVolume(phone);
           sendParty(phone);
         }
         return;
@@ -591,7 +546,6 @@ function createHub(deps) {
         return;
       case "state.get":
         reply(phone, request, { type: "state", playback: playback });
-        sendVolume(phone);
         sendParty(phone);
         if (app) send(app, { type: "state.get" });
         return;
@@ -604,9 +558,6 @@ function createHub(deps) {
       case "cmd":
         response = command(request);
         break;
-      case "volume":
-        changeVolume(phone, request);
-        return;
       // Phones talk to the TV's own API directly with this remote-only key.
       case "ssap.key":
         remoteKey(!!request.refresh).then(function (result) {

@@ -6,6 +6,9 @@ var childProcess = require("child_process");
 var execFile = childProcess.execFile;
 var os = require("os");
 
+var LUNA_TIMEOUT_MS = 5000;
+var SUBSCRIPTION_RETRY_MS = 5000;
+
 function createLunaCaller(options) {
   var binary = options.lunaSend || "luna-send";
   var callerId = options.appId;
@@ -105,59 +108,6 @@ function isPoweredOn(reply) {
   return state === "Active" || state === "Screen Off" || state === "Screen Saver";
 }
 
-/** Tries the calls in order and resolves with the first successful payload. */
-function firstOk(call, calls) {
-  var errors = [];
-  return calls
-    .reduce(function (chain, entry) {
-      return chain.then(function (found) {
-        if (found) return found;
-        return call(entry[0], entry[1]).then(function (result) {
-          if (result && result.returnValue) return result;
-          errors.push(entry[0] + ": " + ((result && result.errorText) || "failed"));
-          return null;
-        });
-      });
-    }, Promise.resolve(null))
-    .then(function (found) {
-      return { result: found, error: errors.join("; ") };
-    });
-}
-
-// webOS 5+ uses com.webos.service.audio/master/*, older firmware com.webos.audio/*.
-// On webOS 23 (tested) master/getVolume is denied for apps, so read via com.webos.audio first.
-var VOLUME_CALLS = {
-  up: [
-    ["luna://com.webos.service.audio/master/volumeUp", {}],
-    ["luna://com.webos.audio/volumeUp", {}]
-  ],
-  down: [
-    ["luna://com.webos.service.audio/master/volumeDown", {}],
-    ["luna://com.webos.audio/volumeDown", {}]
-  ],
-  mute: [
-    ["luna://com.webos.service.audio/master/muteVolume", { muteVolume: true }],
-    ["luna://com.webos.audio/setMuted", { muted: true }]
-  ],
-  unmute: [
-    ["luna://com.webos.service.audio/master/muteVolume", { muteVolume: false }],
-    ["luna://com.webos.audio/setMuted", { muted: false }]
-  ]
-};
-var VOLUME_GET = [
-  ["luna://com.webos.audio/getVolume", {}],
-  ["luna://com.webos.service.audio/master/getVolume", {}]
-];
-
-function readVolume(result) {
-  if (!result) return { level: null, muted: null };
-  var muted = result.muteStatus != null ? result.muteStatus : result.muted;
-  if (muted == null && result.volumeStatus) muted = result.volumeStatus.muteStatus;
-  var level =
-    result.volume != null ? result.volume : result.volumeStatus && result.volumeStatus.volume;
-  return { level: level == null ? null : Number(level), muted: muted == null ? null : !!muted };
-}
-
 // MAC of the LAN interface (Ethernet before Wi-Fi), for Wake-on-LAN from the phone.
 function lanMac(interfaces) {
   var names = Object.keys(interfaces).sort(function (a, b) {
@@ -184,32 +134,6 @@ function createTv(options) {
   var subscribe = options.subscribe || createLunaSubscriber(options);
   var appId = options.appId;
   var alertId = null;
-
-  function volume(action, level) {
-    var calls = VOLUME_CALLS[action];
-    if (action === "set") {
-      var target = Math.max(0, Math.min(100, Math.round(Number(level))));
-      calls = isFinite(target)
-        ? [
-            ["luna://com.webos.service.audio/master/setVolume", { volume: target }],
-            ["luna://com.webos.audio/setVolume", { volume: target }]
-          ]
-        : null;
-    }
-    var change = calls ? firstOk(call, calls) : Promise.resolve(null);
-    return change.then(function (changed) {
-      return firstOk(call, VOLUME_GET).then(function (read) {
-        var state = readVolume(read.result);
-        var failed = changed && !changed.result;
-        return {
-          ok: !failed && !!read.result,
-          level: state.level,
-          muted: state.muted,
-          error: failed ? changed.error : read.result ? null : read.error
-        };
-      });
-    });
-  }
 
   function info() {
     return Promise.all([
@@ -303,7 +227,6 @@ function createTv(options) {
 
   return {
     watchPresence: watchPresence,
-    volume: volume,
     info: info,
     launchApp: launchApp,
     showCode: showCode,
@@ -316,6 +239,5 @@ module.exports = {
   createLunaCaller: createLunaCaller,
   createLunaSubscriber: createLunaSubscriber,
   isPoweredOn: isPoweredOn,
-  lanMac: lanMac,
-  readVolume: readVolume
+  lanMac: lanMac
 };

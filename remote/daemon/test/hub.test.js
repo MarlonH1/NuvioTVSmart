@@ -11,7 +11,7 @@ const path = require("node:path");
 const { attachWebSocketServer } = require("../lib/ws");
 const { createHub } = require("../lib/hub");
 const { createStore } = require("../lib/store");
-const { createTv, createLunaSubscriber, isPoweredOn, readVolume } = require("../lib/tv");
+const { createTv, createLunaSubscriber, isPoweredOn } = require("../lib/tv");
 const net = require("node:net");
 
 // Same request the Magisk watcher sends: HTTP/1.0 over a raw socket, read line by line.
@@ -60,24 +60,7 @@ function fakeTv() {
   const calls = [];
   return {
     calls,
-    level: 20,
-    muted: false,
     info: () => Promise.resolve({ name: "Wohnzimmer", model: "OLED42C3" }),
-    volume(action, level) {
-      calls.push("volume:" + action + (action === "set" ? ":" + level : ""));
-      if (action === "set") {
-        // A slow TV: the slider sends faster than luna answers.
-        this.level = level;
-        return new Promise((resolve) =>
-          setTimeout(() => resolve({ ok: true, level: this.level, muted: this.muted }), 50)
-        );
-      }
-      if (action === "up") this.level += 1;
-      if (action === "down") this.level -= 1;
-      if (action === "mute") this.muted = true;
-      if (action === "unmute") this.muted = false;
-      return Promise.resolve({ ok: true, level: this.level, muted: this.muted });
-    },
     launchApp() {
       calls.push("launch");
       return Promise.resolve({ ok: true });
@@ -217,7 +200,6 @@ test("pairing issues a token that survives reconnects; wrong codes are rejected"
     });
     assert.strictEqual((await again.next("welcome")).paired, true);
     assert.strictEqual((await again.next("state")).playback.status, "idle");
-    assert.strictEqual((await again.next("volume.state")).level, null);
 
     const stranger = await env.connect("/ws");
     stranger.send({ type: "hello", token: "nope" });
@@ -324,50 +306,6 @@ test("pairing code is shown inside the app when it is running", async () => {
   }
 });
 
-test("volume changes are broadcast to every paired phone", async () => {
-  const env = await setup();
-  try {
-    const { phone, token } = await pairPhone(env);
-    const second = await env.connect("/ws");
-    second.send({ type: "hello", token });
-    await second.next("welcome");
-    await second.next("volume.state");
-    phone.send({ type: "volume", action: "up" });
-    assert.strictEqual((await second.next("volume.state")).level, 21);
-    phone.send({ type: "volume", action: "mute" });
-    assert.strictEqual((await phone.next("volume.state", (m) => m.muted)).muted, true);
-  } finally {
-    env.teardown();
-  }
-});
-
-test("tv adapter falls back between luna APIs and parses volume replies", async () => {
-  const seen = [];
-  const tv = createTv({
-    appId: "com.marlon.nuvio",
-    call: (uri, params) => {
-      seen.push(uri);
-      if (uri.includes("master/volumeUp"))
-        return Promise.resolve({ returnValue: false, errorText: "denied" });
-      if (uri.endsWith("com.webos.audio/volumeUp")) return Promise.resolve({ returnValue: true });
-      if (uri.endsWith("com.webos.audio/getVolume"))
-        return Promise.resolve({ returnValue: true, volume: 69, muteStatus: false });
-      return Promise.resolve({ returnValue: false });
-    }
-  });
-  const result = await tv.volume("up");
-  assert.deepStrictEqual(result, { ok: true, level: 69, muted: false, error: null });
-  assert.deepStrictEqual(seen, [
-    "luna://com.webos.service.audio/master/volumeUp",
-    "luna://com.webos.audio/volumeUp",
-    "luna://com.webos.audio/getVolume"
-  ]);
-  assert.deepStrictEqual(readVolume({ volumeStatus: { volume: 5, muteStatus: true } }), {
-    level: 5,
-    muted: true
-  });
-});
-
 test("watch stream reports only playback start/stop and rejects unknown tokens", async () => {
   const env = await setup();
   try {
@@ -407,47 +345,6 @@ test("watch stream reports only playback start/stop and rejects unknown tokens",
   } finally {
     env.teardown();
   }
-});
-
-test("slider drags only apply the newest absolute volume", async () => {
-  const env = await setup();
-  try {
-    const { phone } = await pairPhone(env);
-    for (const level of [30, 35, 40, 45, 50]) phone.send({ type: "volume", action: "set", level });
-    const state = await phone.next("volume.state", (m) => m.level === 50);
-    assert.strictEqual(state.level, 50);
-    await new Promise((r) => setTimeout(r, 150));
-    const sets = env.tv.calls.filter((c) => c.startsWith("volume:set"));
-    // The first one runs immediately, the rest collapse into the newest.
-    assert.deepStrictEqual(sets, ["volume:set:30", "volume:set:50"]);
-    // No intermediate level was broadcast.
-    assert.strictEqual(
-      phone.inbox.filter((m) => m.type === "volume.state" && m.level !== 50).length,
-      0
-    );
-  } finally {
-    env.teardown();
-  }
-});
-
-test("tv adapter sets absolute volume via luna", async () => {
-  const seen = [];
-  const tv = createTv({
-    appId: "com.marlon.nuvio",
-    call: (uri, params) => {
-      seen.push([uri, params]);
-      if (uri.endsWith("master/setVolume")) return Promise.resolve({ returnValue: true });
-      if (uri.endsWith("com.webos.audio/getVolume"))
-        return Promise.resolve({ returnValue: true, volume: 42, muteStatus: false });
-      return Promise.resolve({ returnValue: false });
-    }
-  });
-  const result = await tv.volume("set", 42.4);
-  assert.strictEqual(result.level, 42);
-  assert.deepStrictEqual(seen[0], [
-    "luna://com.webos.service.audio/master/setVolume",
-    { volume: 42 }
-  ]);
 });
 
 function playingState(positionMs) {
