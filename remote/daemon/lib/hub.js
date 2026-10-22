@@ -50,7 +50,8 @@ var COMMANDS = {
   subtitleDelay: true,
   skip: true,
   speed: true,
-  subtitleStyle: true
+  subtitleStyle: true,
+  partyStart: true
 };
 
 function randomCode() {

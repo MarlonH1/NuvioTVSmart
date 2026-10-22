@@ -527,6 +527,10 @@ async function runCommand(message) {
       }
       break;
     }
+    case "partyStart":
+      // Same as "Start watch party" in the player's party panel; errors show on the TV.
+      if (!partySource?.getParty?.()) safe(() => player.startParty());
+      break;
     default:
       break;
   }
