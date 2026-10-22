@@ -88,7 +88,9 @@ function isLoopback(address) {
  * @param deps.staleAppMs, deps.staleCheckMs  optional watchdog timings, for tests
  */
 function createHub(deps) {
-  var readFile = (deps && deps.readFile) || require("fs").readFile;
+  var registerRemoteKey = (deps && deps.registerRemoteKey) || require("./ssap").registerRemoteKey;
+  var ssapPort = require("./ssap").SSAP_PORT;
+  var keyRequest = null;
   var tv = deps.tv;
   var store = deps.store;
   var log = deps.log || function () {};
@@ -251,70 +253,21 @@ function createHub(deps) {
     if (wasActive !== isActive(playback)) notifyWatchers();
   }
 
-  // Icon files of the last app list, by app id; only these paths are ever served.
-  var appIcons = {};
-
-  /** Most recently opened first, the rest by title; icons via handleAppIcon. */
-  function describeApps(apps) {
-    var recent = store.recentAppIds();
-    appIcons = {};
-    apps.forEach(function (app) {
-      if (app.iconPath) appIcons[app.id] = app.iconPath;
-    });
-    return apps
-      .slice()
-      .sort(function (a, b) {
-        var ra = recent.indexOf(a.id);
-        var rb = recent.indexOf(b.id);
-        if (ra !== rb) return (ra < 0 ? Infinity : ra) - (rb < 0 ? Infinity : rb) || 0;
-        return a.title.localeCompare(b.title);
-      })
-      .map(function (app) {
-        return {
-          id: app.id,
-          title: app.title,
-          icon: app.iconPath ? "/apps/icon?id=" + encodeURIComponent(app.id) : null
-        };
+  /** The stored key, or one registration (TV prompt) shared by every phone asking meanwhile. */
+  function remoteKey(refresh) {
+    if (refresh) store.setSsapKey(null);
+    var known = store.ssapKey();
+    if (known) return Promise.resolve({ ok: true, key: known });
+    if (!keyRequest) {
+      log("ssap: requesting a remote key, confirm the prompt on the TV");
+      keyRequest = registerRemoteKey({ log: log }).then(function (result) {
+        keyRequest = null;
+        if (result.ok) store.setSsapKey(result.key);
+        else log("ssap: registration failed: " + result.error);
+        return result;
       });
-  }
-
-  function queryParams(req) {
-    var params = {};
-    (String(req.url || "").split("?")[1] || "").split("&").forEach(function (pair) {
-      var parts = pair.split("=");
-      if (parts[0]) params[parts[0]] = decodeURIComponent(parts[1] || "");
-    });
-    return params;
-  }
-
-  /** GET /apps/icon?id=…&token=…: an app icon for paired phones. */
-  function handleAppIcon(req, res) {
-    var params = queryParams(req);
-    if (!params.token || !store.hasToken(params.token)) {
-      res.writeHead(401, { "Content-Type": "text/plain" });
-      res.end("not paired\n");
-      return;
     }
-    var file = appIcons[params.id];
-    if (!file) {
-      res.writeHead(404, { "Content-Type": "text/plain" });
-      res.end("unknown app\n");
-      return;
-    }
-    readFile(file, function (error, data) {
-      if (error) {
-        res.writeHead(404, { "Content-Type": "text/plain" });
-        res.end("no icon\n");
-        return;
-      }
-      var type = /\.jpe?g$/i.test(file)
-        ? "image/jpeg"
-        : /\.svg$/i.test(file)
-          ? "image/svg+xml"
-          : "image/png";
-      res.writeHead(200, { "Content-Type": type, "Cache-Control": "max-age=86400" });
-      res.end(data);
-    });
+    return keyRequest;
   }
 
   function handleWatch(req, res) {
@@ -654,24 +607,21 @@ function createHub(deps) {
       case "volume":
         changeVolume(phone, request);
         return;
-      // Full TV remote: buttons, system screens and the app list.
-      case "key":
-        tv.pressKey(String(request.key || "")).then(function (result) {
-          if (!result.ok) {
-            reply(phone, request, { type: "error", code: "key_failed", message: result.error });
-          }
-        });
-        return;
-      case "launch":
-        tv.launchTarget(String(request.target || "")).then(function (result) {
-          if (!result.ok) {
-            reply(phone, request, { type: "error", code: "launch_failed", message: result.error });
-          }
-        });
-        return;
-      case "apps.get":
-        tv.listApps().then(function (apps) {
-          reply(phone, request, { type: "apps", apps: describeApps(apps) });
+      // Phones talk to the TV's own API directly with this remote-only key.
+      case "ssap.key":
+        remoteKey(!!request.refresh).then(function (result) {
+          reply(
+            phone,
+            request,
+            result.ok
+              ? {
+                  type: "ssap.key",
+                  key: result.key,
+                  port: ssapPort,
+                  recentApps: store.recentAppIds()
+                }
+              : { type: "error", code: "ssap_denied", message: result.error }
+          );
         });
         return;
       default:
@@ -774,7 +724,6 @@ function createHub(deps) {
   return {
     handleConnection: handleConnection,
     handleWatch: handleWatch,
-    handleAppIcon: handleAppIcon,
     status: function () {
       return {
         tv: tvInfo,

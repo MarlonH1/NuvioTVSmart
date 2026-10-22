@@ -4,90 +4,7 @@
 
 var childProcess = require("child_process");
 var execFile = childProcess.execFile;
-var fs = require("fs");
 var os = require("os");
-
-// Remote buttons as Linux key codes for LG's own remote input device ("LGE RCU"). Writing key
-// events to that device makes webOS treat them exactly like presses on the physical remote.
-// Codes verified on webOS 10 (OLED C4): e.g. OK is KEY_ENTER and Back is KEY_PREVIOUS.
-var REMOTE_KEYS = {
-  up: 103,
-  down: 108,
-  left: 105,
-  right: 106,
-  ok: 28,
-  back: 412,
-  play: 207,
-  pause: 119,
-  rewind: 168,
-  fastForward: 208,
-  channelUp: 402,
-  channelDown: 403,
-  info: 358,
-  power: 116,
-  red: 398,
-  green: 399,
-  yellow: 400,
-  blue: 401,
-  0: 11,
-  1: 2,
-  2: 3,
-  3: 4,
-  4: 5,
-  5: 6,
-  6: 7,
-  7: 8,
-  8: 9,
-  9: 10
-};
-var REMOTE_DEVICE_NAME = "LGE RCU";
-var KEY_PRESS_MS = 40;
-
-// System screens the remote can open directly (the Home and Settings keys do not inject
-// reliably, launching the apps does).
-var LAUNCH_TARGETS = {
-  home: "com.webos.app.home",
-  settings: "com.palm.app.settings",
-  hdmi1: "com.webos.app.hdmi1",
-  hdmi2: "com.webos.app.hdmi2",
-  hdmi3: "com.webos.app.hdmi3",
-  hdmi4: "com.webos.app.hdmi4"
-};
-var APP_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
-
-/** Event node of the remote input device, from /proc/bus/input/devices text. */
-function remoteDevicePath(devicesText) {
-  var blocks = String(devicesText || "").split(/\n\s*\n/);
-  for (var i = 0; i < blocks.length; i += 1) {
-    if (blocks[i].indexOf('Name="' + REMOTE_DEVICE_NAME + '"') < 0) continue;
-    var match = blocks[i].match(/Handlers=.*?\b(event\d+)\b/);
-    if (match) return "/dev/input/" + match[1];
-  }
-  return null;
-}
-
-/** One `struct input_event`; the timeval fields are 64-bit on arm64/x64. */
-function inputEvent(type, code, value, wide) {
-  var size = wide ? 24 : 16;
-  var buffer = Buffer.alloc(size);
-  var nowMs = Date.now();
-  var seconds = Math.floor(nowMs / 1000);
-  var micros = (nowMs % 1000) * 1000;
-  if (wide) {
-    buffer.writeBigInt64LE(BigInt(seconds), 0);
-    buffer.writeBigInt64LE(BigInt(micros), 8);
-  } else {
-    buffer.writeInt32LE(seconds, 0);
-    buffer.writeInt32LE(micros, 4);
-  }
-  buffer.writeUInt16LE(type, size - 8);
-  buffer.writeUInt16LE(code, size - 6);
-  buffer.writeInt32LE(value, size - 4);
-  return buffer;
-}
-
-var LUNA_TIMEOUT_MS = 5000;
-var SUBSCRIPTION_RETRY_MS = 5000;
 
 function createLunaCaller(options) {
   var binary = options.lunaSend || "luna-send";
@@ -320,87 +237,6 @@ function createTv(options) {
     });
   }
 
-  var keyDevice = null;
-  function keyDevicePath() {
-    if (keyDevice) return keyDevice;
-    var text = "";
-    try {
-      text = fs.readFileSync("/proc/bus/input/devices", "utf8");
-    } catch (error) {
-      text = "";
-    }
-    keyDevice = remoteDevicePath(text) || "/dev/input/event0";
-    return keyDevice;
-  }
-
-  /** Presses one remote button (see REMOTE_KEYS). */
-  function pressKey(name) {
-    var code = REMOTE_KEYS[name];
-    if (code == null) return Promise.resolve({ ok: false, error: "unknown key " + name });
-    var wide = os.arch() === "arm64" || os.arch() === "x64";
-    var write = options.writeKey;
-    return new Promise(function (resolve) {
-      var fd;
-      try {
-        fd = write ? null : fs.openSync(keyDevicePath(), "w");
-        var emit = function (type, eventCode, value) {
-          var event = inputEvent(type, eventCode, value, wide);
-          if (write) write(event);
-          else fs.writeSync(fd, event);
-        };
-        emit(1, code, 1);
-        emit(0, 0, 0);
-        setTimeout(function () {
-          try {
-            emit(1, code, 0);
-            emit(0, 0, 0);
-            resolve({ ok: true });
-          } catch (error) {
-            resolve({ ok: false, error: error.message });
-          } finally {
-            if (fd != null) fs.closeSync(fd);
-          }
-        }, KEY_PRESS_MS);
-      } catch (error) {
-        if (fd != null) fs.closeSync(fd);
-        resolve({ ok: false, error: error.message });
-      }
-    });
-  }
-
-  /** Opens Home, Settings, an HDMI input or any app id. */
-  function launchTarget(target) {
-    var id = LAUNCH_TARGETS[target] || target;
-    if (!APP_ID_PATTERN.test(String(id || ""))) {
-      return Promise.resolve({ ok: false, error: "bad target" });
-    }
-    return call("luna://com.webos.applicationManager/launch", { id: id }).then(function (result) {
-      return { ok: !!result.returnValue, error: result.errorText || null };
-    });
-  }
-
-  /** The apps on the home screen, with the absolute path of each icon on the TV. */
-  function listApps() {
-    return call("luna://com.webos.applicationManager/listLaunchPoints", {}).then(function (result) {
-      var points = Array.isArray(result.launchPoints) ? result.launchPoints : [];
-      var seen = {};
-      return points
-        .filter(function (point) {
-          if (!point || !point.id || !point.title || point.hidden || seen[point.id]) return false;
-          seen[point.id] = true;
-          return true;
-        })
-        .map(function (point) {
-          var icon = String(point.icon || point.largeIcon || "");
-          return {
-            id: String(point.id),
-            title: String(point.title),
-            iconPath: icon.charAt(0) === "/" ? icon : null
-          };
-        });
-    });
-  }
-
   function hideCode() {
     if (!alertId) return Promise.resolve();
     var id = alertId;
@@ -470,9 +306,6 @@ function createTv(options) {
     volume: volume,
     info: info,
     launchApp: launchApp,
-    pressKey: pressKey,
-    launchTarget: launchTarget,
-    listApps: listApps,
     showCode: showCode,
     hideCode: hideCode
   };
@@ -482,9 +315,6 @@ module.exports = {
   createTv: createTv,
   createLunaCaller: createLunaCaller,
   createLunaSubscriber: createLunaSubscriber,
-  remoteDevicePath: remoteDevicePath,
-  inputEvent: inputEvent,
-  REMOTE_KEYS: REMOTE_KEYS,
   isPoweredOn: isPoweredOn,
   lanMac: lanMac,
   readVolume: readVolume

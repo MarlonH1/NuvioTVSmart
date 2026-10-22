@@ -64,6 +64,14 @@ function createStore(file, log) {
       data.recentApps = recent.slice(0, 30);
       save();
     },
+    /** Remote-only client key for the TV's own API (SSAP), shared with paired phones. */
+    ssapKey: function () {
+      return data.ssapKey || null;
+    },
+    setSsapKey: function (key) {
+      data.ssapKey = key || null;
+      save();
+    },
     recentAppIds: function () {
       return (Array.isArray(data.recentApps) ? data.recentApps : []).map(function (entry) {
         return entry.id;

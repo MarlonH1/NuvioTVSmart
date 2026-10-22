@@ -82,23 +82,6 @@ function fakeTv() {
       calls.push("launch");
       return Promise.resolve({ ok: true });
     },
-    pressKey(name) {
-      calls.push("key:" + name);
-      return Promise.resolve(
-        name === "nope" ? { ok: false, error: "unknown key nope" } : { ok: true }
-      );
-    },
-    launchTarget(target) {
-      calls.push("target:" + target);
-      return Promise.resolve({ ok: true });
-    },
-    listApps() {
-      return Promise.resolve([
-        { id: "netflix", title: "Netflix", iconPath: "/apps/netflix/icon.png" },
-        { id: "youtube.leanback.v4", title: "YouTube", iconPath: "/apps/youtube/icon.png" },
-        { id: "com.webos.app.hdmi1", title: "HDMI 1", iconPath: null }
-      ]);
-    },
     showCode(code) {
       calls.push("showCode");
       this.code = code;
@@ -575,109 +558,85 @@ test("an input that takes over right after a play launch brings Nuvio back, twic
   }
 });
 
-test("paired phones press remote keys, open screens and list apps", async () => {
-  const env = await setup();
+test("phones get one shared remote-only TV API key", async () => {
+  let registrations = 0;
+  let answer = { ok: true, key: "remote-key-1" };
+  let release;
+  const gate = new Promise((resolve) => (release = resolve));
+  const env = await setup({
+    registerRemoteKey: () => {
+      registrations += 1;
+      return gate.then(() => answer);
+    }
+  });
   try {
     const { phone } = await pairPhone(env);
-    phone.send({ type: "key", key: "down" });
-    phone.send({ type: "launch", target: "hdmi2" });
-    await waitFor(() => env.tv.calls.includes("key:down") && env.tv.calls.includes("target:hdmi2"));
-    phone.send({ type: "key", key: "nope", id: "k" });
-    assert.strictEqual((await phone.next("error")).code, "key_failed");
-    phone.send({ type: "apps.get", id: "a" });
-    const apps = (await phone.next("apps")).apps;
-    assert.deepStrictEqual(apps[0], { id: "com.webos.app.hdmi1", title: "HDMI 1", icon: null });
-    assert.strictEqual(apps[1].icon, "/apps/icon?id=netflix");
-  } finally {
-    env.teardown();
-  }
-});
-
-test("apps are listed most recently opened first and icons need a token", async () => {
-  const env = await setup();
-  try {
-    const { phone, token } = await pairPhone(env);
     env.tv.presence({ poweredOn: true, foregroundAppId: "netflix" });
     env.tv.presence({ poweredOn: true, foregroundAppId: "youtube.leanback.v4" });
-    phone.send({ type: "apps.get" });
-    const apps = (await phone.next("apps")).apps.map((app) => app.id);
-    assert.deepStrictEqual(apps, ["youtube.leanback.v4", "netflix", "com.webos.app.hdmi1"]);
+    phone.send({ type: "ssap.key", id: "a" });
+    phone.send({ type: "ssap.key", id: "b" });
+    await waitFor(() => registrations === 1);
+    release();
+    const first = await phone.next("ssap.key");
+    const second = await phone.next("ssap.key");
+    assert.strictEqual(first.key, "remote-key-1");
+    assert.strictEqual(second.key, "remote-key-1");
+    assert.strictEqual(first.port, 3001);
+    assert.deepStrictEqual(
+      first.recentApps.slice(0, 2),
+      ["youtube.leanback.v4", "netflix"],
+      "most recent first"
+    );
+    assert.strictEqual(registrations, 1, "one TV prompt for both requests");
 
-    const fakeRes = () => {
-      const res = { headers: null, status: 0, body: null };
-      res.writeHead = (status, headers) => {
-        res.status = status;
-        res.headers = headers;
-      };
-      res.end = (body) => {
-        res.body = body;
-      };
-      return res;
-    };
-    const noToken = fakeRes();
-    env.hub.handleAppIcon({ url: "/apps/icon?id=netflix" }, noToken);
-    assert.strictEqual(noToken.status, 401);
-    const unknown = fakeRes();
-    env.hub.handleAppIcon({ url: "/apps/icon?id=evil&token=" + token }, unknown);
-    assert.strictEqual(unknown.status, 404);
+    phone.send({ type: "ssap.key", id: "c" });
+    assert.strictEqual((await phone.next("ssap.key")).key, "remote-key-1");
+    assert.strictEqual(registrations, 1, "stored key is reused");
+
+    answer = { ok: false, error: "403 cancelled" };
+    phone.send({ type: "ssap.key", id: "d", refresh: true });
+    const denied = await phone.next("error");
+    assert.strictEqual(denied.code, "ssap_denied");
+    assert.strictEqual(registrations, 2);
   } finally {
     env.teardown();
   }
 });
 
-test("unpaired phones cannot press keys", async () => {
-  const env = await setup();
+test("unpaired phones cannot get the TV API key", async () => {
+  const env = await setup({ registerRemoteKey: () => Promise.resolve({ ok: true, key: "k" }) });
   try {
     const phone = await env.connect("/ws");
     phone.send({ type: "hello", client: { id: "x", name: "X", platform: "android" } });
     await phone.next("welcome");
-    phone.send({ type: "key", key: "power" });
+    phone.send({ type: "ssap.key" });
     assert.strictEqual((await phone.next("error")).code, "not_paired");
-    assert.ok(!env.tv.calls.some((call) => call.startsWith("key:")));
   } finally {
     env.teardown();
   }
 });
 
-test("remote key device lookup and input_event layout", () => {
-  const { remoteDevicePath, inputEvent, createTv, REMOTE_KEYS } = require("../lib/tv");
-  const devices = [
-    'I: Bus=0000\nN: Name="Bluetooth-audio-source"\nH: Handlers=event2',
-    'I: Bus=0000\nN: Name="LGE RCU"\nH: Handlers=kbd event7 \nB: EV=7'
-  ].join("\n\n");
-  assert.strictEqual(remoteDevicePath(devices), "/dev/input/event7");
-  assert.strictEqual(remoteDevicePath("nothing"), null);
+test("remote key registration asks only for remote permissions", () => {
+  const ssap = require("../lib/ssap");
+  const signed = ssap.registrationPayload(true, null);
+  assert.deepStrictEqual(signed.manifest.permissions, ssap.REMOTE_PERMISSIONS);
+  assert.ok(signed.manifest.signed && signed.manifest.signatures.length === 1);
+  assert.ok(!signed.manifest.permissions.includes("WRITE_SETTINGS"));
+  assert.ok(!signed.manifest.permissions.includes("READ_NOTIFICATIONS"));
+  const unsigned = ssap.registrationPayload(false, "known");
+  assert.strictEqual(unsigned.manifest.signed, undefined);
+  assert.strictEqual(unsigned["client-key"], "known");
 
-  const wide = inputEvent(1, 28, 1, true);
-  assert.strictEqual(wide.length, 24);
-  assert.strictEqual(wide.readUInt16LE(16), 1);
-  assert.strictEqual(wide.readUInt16LE(18), 28);
-  assert.strictEqual(wide.readInt32LE(20), 1);
-  assert.strictEqual(inputEvent(1, 28, 1, false).length, 16);
-  assert.strictEqual(REMOTE_KEYS.ok, 28);
-  assert.strictEqual(REMOTE_KEYS.back, 412);
-
-  const written = [];
-  const tv = createTv({
-    call: () => Promise.resolve({}),
-    subscribe: () => () => {},
-    writeKey: (b) => written.push(b)
-  });
-  return tv.pressKey("left").then((result) => {
-    assert.ok(result.ok);
-    const codes = written.map((b) => [
-      b.readUInt16LE(b.length - 8),
-      b.readUInt16LE(b.length - 6),
-      b.readInt32LE(b.length - 4)
-    ]);
-    assert.deepStrictEqual(codes, [
-      [1, 105, 1],
-      [0, 0, 0],
-      [1, 105, 0],
-      [0, 0, 0]
-    ]);
-    return tv.pressKey("bogus").then((bad) => assert.strictEqual(bad.ok, false));
-  });
+  const frame = (text) => {
+    const body = Buffer.from(text);
+    return Buffer.concat([Buffer.from([0x81, body.length]), body]);
+  };
+  const [messages, rest] = ssap.readServerFrames(
+    Buffer.concat([frame('{"a":1}'), frame('{"b":2}'), Buffer.from([0x81])])
+  );
+  assert.deepStrictEqual(messages, ['{"a":1}', '{"b":2}']);
+  assert.strictEqual(rest.length, 1);
+  assert.strictEqual(ssap.clientFrame("hi")[1] & 0x80, 0x80, "client frames are masked");
 });
 
 test("lanMac prefers Ethernet and skips loopback", () => {
