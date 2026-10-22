@@ -1,7 +1,7 @@
 // Android ui/screens/party/PartyEffects.kt: app-wide watch party toasts and
 // an availability refresh whenever the app comes to the foreground.
 import { PartyRepository } from "../../../core/party/partyRepository.js";
-import { PartyEventType, partyMember } from "../../../core/party/partyModels.js";
+import { PartyEventType, isPartyHost, partyMember } from "../../../core/party/partyModels.js";
 import {
   PartyFriends,
   isValidFriendCode,
@@ -111,7 +111,9 @@ export function installPartyEffects(repository = PartyRepository) {
   setRemotePartySource({
     getParty: () => repository.getState().party,
     subscribe: (listener) => repository.subscribeState(listener),
-    invite: (friendCode) => inviteFromRemote(repository, friendCode)
+    invite: (friendCode) => inviteFromRemote(repository, friendCode),
+    // The host ends the party for everyone, a member only leaves it (same as the party panel).
+    end: () => (isPartyHost(repository.getState().party) ? repository.end() : repository.leave())
   });
   void repository.refreshAvailability();
   document.addEventListener("visibilitychange", () => {

@@ -47,7 +47,7 @@ let lastError = null;
 let lifecycleBound = false;
 // Watch party hooks, installed by the party UI (setRemotePartySource) so this module does not
 // pull in the party repository: getParty() -> active party or null, subscribe(listener),
-// invite(friendCode) -> {ok, code?}.
+// invite(friendCode) -> {ok, code?}, end() ends (host) or leaves the party.
 let partySource = null;
 let lastPartyJson = "";
 
@@ -465,6 +465,12 @@ async function runCommand(message) {
   if (message.action === "subtitleStyle") {
     applyRemoteSubtitleStyle(player, message.style);
     setTimeout(() => pushStateIfChanged(true), 250);
+    return;
+  }
+  if (message.action === "partyEnd") {
+    // Works from any screen: the party outlives the player.
+    await safe(() => partySource?.end?.());
+    pushParty();
     return;
   }
   if (!player) {
