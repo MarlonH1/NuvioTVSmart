@@ -5,6 +5,12 @@ import { getHomeFocusIdentity } from "./homeFocusPolicy.js";
 const sourceByNode = new WeakMap();
 const mountedShells = new WeakMap();
 
+// Row positions change for every row below one that just arrived. They are left out of the
+// comparison and patched on their own, so a row that only moved is not re-diffed card by card.
+const POSITION_ATTRIBUTES = ["data-row-index", "data-nav-row"];
+const POSITION_ATTRIBUTE_PATTERN = / data-(?:row-index|nav-row)="[^"]*"/g;
+const POSITION_SELECTOR = "[data-row-index], [data-nav-row]";
+
 export function hasMountedHomeDom(container) {
   const shell = mountedShells.get(container);
   return Boolean(shell && shell === container.querySelector(".home-shell"));
@@ -36,13 +42,33 @@ function signature(node) {
   // wrapper and descendant repeats the same markup at each ancestor depth.
   // Other elements still reconcile attributes and children from source nodes.
   return node.dataset.rowKey || node.classList.contains("home-content-card")
-    ? node.outerHTML
+    ? node.outerHTML.replace(POSITION_ATTRIBUTE_PATTERN, "")
     : undefined;
 }
 
-function snapshot(source) {
+function snapshot(source, markup = signature(source)) {
   // Shallow nodes cannot retain entire detached markup trees through parentNode.
-  return { node: source.cloneNode(false), markup: signature(source) };
+  return { node: source.cloneNode(false), markup };
+}
+
+function positionNodes(root) {
+  const nodes = Array.from(root.querySelectorAll(POSITION_SELECTOR));
+  return root.matches(POSITION_SELECTOR) ? [root, ...nodes] : nodes;
+}
+
+// Copies the position attributes of an otherwise identical subtree. Returns false when the
+// trees do not line up (e.g. runtime-added nodes), so the caller falls back to a full update.
+function patchPositions(node, source) {
+  const live = positionNodes(node);
+  const next = positionNodes(source);
+  if (live.length !== next.length) return false;
+  live.forEach((element, index) => {
+    POSITION_ATTRIBUTES.forEach((name) => {
+      const value = next[index].getAttribute(name);
+      if (value !== null && element.getAttribute(name) !== value) element.setAttribute(name, value);
+    });
+  });
+  return true;
 }
 
 function remember(node, source) {
@@ -114,14 +140,20 @@ function updateAttributes(node, previous, next) {
 function updateNode(node, source, protectedNode) {
   const previous = sourceByNode.get(node);
   const markup = signature(source);
-  if (markup !== undefined && previous.markup === markup) return;
+  if (markup !== undefined && previous.markup === markup) {
+    if (node.nodeType !== 1) return;
+    if (patchPositions(node, source)) {
+      sourceByNode.set(node, snapshot(source, markup));
+      return;
+    }
+  }
   if (node.nodeType === 1) {
     updateAttributes(node, previous.node, source);
     updateChildren(node, source, protectedNode);
   } else {
     node.textContent = source.textContent;
   }
-  sourceByNode.set(node, snapshot(source));
+  sourceByNode.set(node, snapshot(source, markup));
 }
 
 function updateChildren(parent, source, protectedNode) {

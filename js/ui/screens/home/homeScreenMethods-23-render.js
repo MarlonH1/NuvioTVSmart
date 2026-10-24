@@ -40,6 +40,7 @@ export function createHomeScreenMethods23() {
   return {
     render() {
       const renderStart = HOME_PERF_DEBUG ? homePerfNow() : 0;
+      const renderStartedAt = Date.now();
       this.cancelScheduledRender();
       const liveFocusedNode = this.getCurrentFocusedNode();
       if (this.hasUserInteractedSinceHomePaint) {
@@ -477,10 +478,13 @@ export function createHomeScreenMethods23() {
       this.homeRouteEnterPending = false;
       this.renderedLayoutMode = this.layoutMode;
       this.ensureHomeTruncationObservers();
-      this.scheduleHomeTruncationUpdate();
+      this.scheduleHomeTruncationUpdate({ skipUnchangedHero: true });
       void ensureHeroMdbListRatings.call(this);
       this.scheduleHomeLazyImageHydration(null, { refreshIndex: true });
       this.scheduleReturnFocusRestore();
+      // Spaces out the next background render (requestBackgroundRender).
+      this.lastHomeRenderEndAt = Date.now();
+      this.lastHomeRenderMs = this.lastHomeRenderEndAt - renderStartedAt;
       const mountedRows = Number(this.navModel?.rows?.length || 0);
       const mountedCards = Number((this.navModel?.rows || []).reduce((total, rowNodes) => total + rowNodes.length, 0));
       logHomePerf("render", {

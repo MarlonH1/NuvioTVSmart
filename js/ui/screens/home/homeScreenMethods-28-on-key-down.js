@@ -24,6 +24,8 @@ export function createHomeScreenMethods28() {
       if (code === 13 || isDirectionalKeyCode(code)) {
         this.markUserInteractionSinceHomePaint();
       }
+      // Any key (OK and Back too) holds background renders back, see shouldDeferHomeRenderForInput.
+      this.lastHomeInputAt = Date.now();
       if (this._homeHoldDialog) {
         return true;
       }

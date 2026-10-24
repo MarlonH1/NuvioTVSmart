@@ -662,7 +662,11 @@ class AddonRepository {
     const includeDisabled = Boolean(options?.includeDisabled);
     const allUrls = this.getInstalledAddonUrls();
     const enabledStates = this.getAddonEnabledStates();
-    const urls = includeDisabled ? allUrls : allUrls.filter((url) => this.isAddonEnabled(url));
+    // Same check as isAddonEnabled(), against the states read once above: re-reading and
+    // normalizing the stored states for every addon dominated Home startup.
+    const urls = includeDisabled
+      ? allUrls
+      : allUrls.filter((url) => this.getAddonMapValue(enabledStates, url) !== false);
     const cacheKey = JSON.stringify({
       profileId: this.getActiveStorageProfileId(),
       urls,

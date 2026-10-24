@@ -2,6 +2,11 @@ import * as internals from "./homeScreenContext.js";
 import { getTvRuntimePerformanceProfile } from "../../../platform/tvRuntimePerformance.js";
 import { startHomeContinueWatchingLoad } from "./homeContinueWatchingLoad.js";
 
+// Background renders (rows still arriving after startup) wait this long after the last key
+// press, and leave the main thread idle for at least as long as the previous render took.
+const HOME_INPUT_RENDER_DEFER_MS = 1000;
+const HOME_BACKGROUND_RENDER_MAX_SPACING_MS = 3000;
+
 function catalogItemIdentity(item = {}) {
   const id = String(item?.id || item?.videoId || item?.contentId || "").trim();
   if (!id) {
@@ -199,10 +204,22 @@ export function createHomeScreenMethods04() {
       });
     },
     requestBackgroundRender() {
-      this.requestRender({ delayMs: this.getBackgroundRenderDelay() });
+      // Throttle rather than debounce: rows keep arriving during startup and restarting the
+      // timer for each one would hold all of them back. The pending render picks them all up.
+      if (this.homeRenderTimer || this.homeRenderFrame) {
+        return;
+      }
+      const sinceLastRender = Date.now() - Number(this.lastHomeRenderEndAt || 0);
+      const spacing = Math.min(HOME_BACKGROUND_RENDER_MAX_SPACING_MS, Number(this.lastHomeRenderMs || 0)) - sinceLastRender;
+      this.requestRender({ delayMs: Math.max(this.getBackgroundRenderDelay(), spacing) });
     },
     shouldDeferHomeRenderForInput() {
       if (this.layoutMode === "modern" && this.hasUserInteractedSinceHomePaint && this.shouldSuspendModernViewportFocusSync()) {
+        return true;
+      }
+      // A full render blocks input for hundreds of milliseconds once many rows are mounted,
+      // so it waits while the user is navigating (e.g. heading to another menu right away).
+      if (Date.now() - Number(this.lastHomeInputAt || 0) < HOME_INPUT_RENDER_DEFER_MS) {
         return true;
       }
       // Tizen fast path: on constrained/legacy runtimes a full innerHTML

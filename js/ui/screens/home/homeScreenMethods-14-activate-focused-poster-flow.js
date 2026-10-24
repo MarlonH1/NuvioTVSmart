@@ -1,6 +1,9 @@
 import { registerHomeDomNodes } from "./homeDomUpdate.js";
 import * as internals from "./homeScreenContext.js";
 
+// What the description bounds were last computed for, per description node.
+const heroDescriptionBoundsKeys = new WeakMap();
+
 export function createHomeScreenMethods14() {
   const { applyTrailerAudioPreferences } = internals;
 
@@ -103,14 +106,14 @@ export function createHomeScreenMethods14() {
       }
       return `${itemType}:${itemId}`;
     },
-    scheduleHomeTruncationUpdate({ scope = null } = {}) {
+    scheduleHomeTruncationUpdate({ scope = null, skipUnchangedHero = false } = {}) {
       if (!this.container) {
         return;
       }
       if (this.layoutMode === "modern") {
         // Commit bounds in the same render. Keeping the full text and letting
         // CSS draw ellipsis avoids a full-text frame between background refreshes.
-        this.applyModernHeroDescriptionBounds(scope || this.container);
+        this.applyModernHeroDescriptionBounds(scope || this.container, { skipUnchanged: skipUnchangedHero });
         return;
       }
       // Tizen fast path: the binary-search textContent loop below forces
@@ -192,7 +195,7 @@ export function createHomeScreenMethods14() {
       });
       registerHomeDomNodes(Array.from(nodes).filter((node) => node instanceof HTMLElement));
     },
-    applyModernHeroDescriptionBounds(root = null) {
+    applyModernHeroDescriptionBounds(root = null, { skipUnchanged = false } = {}) {
       if (!this.container || this.layoutMode !== "modern") {
         return;
       }
@@ -208,6 +211,22 @@ export function createHomeScreenMethods14() {
         if (description.classList.contains("is-empty")) {
           return;
         }
+
+        // Measuring forces a layout of the whole Home right after a render wrote to it. A
+        // background render that left the hero alone does not need new bounds.
+        const copyNode = description.closest(".home-modern-hero-copy");
+        const logo = copyNode?.querySelector("img");
+        const boundsKey = [
+          copyNode?.textContent || description.textContent,
+          copyNode?.childElementCount || 0,
+          logo ? `${logo.getAttribute("src") || ""}:${logo.complete}` : "",
+          globalThis.innerWidth,
+          globalThis.innerHeight
+        ].join("|");
+        if (skipUnchanged && heroDescriptionBoundsKeys.get(description) === boundsKey) {
+          return;
+        }
+        heroDescriptionBoundsKeys.set(description, boundsKey);
 
         const descriptionStyle = getComputedStyle(description);
         const lineHeight = parseFloat(descriptionStyle.lineHeight || "0") || 0;

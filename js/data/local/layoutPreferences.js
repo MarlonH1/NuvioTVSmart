@@ -205,9 +205,26 @@ const store = createProfileScopedStore({
   normalize: normalizeLayoutPreferences
 });
 
+let appliedCardDepthKey = "";
+
 function applyCardDepthPresentation(settings) {
   const root = globalThis?.document?.documentElement;
   if (!root) return;
+  // get() runs this on every read (dozens of times per Home render); touching the root's
+  // attributes and variables each time made the browser recheck styles for the whole page.
+  const key = [
+    settings.cardDepthEnabled,
+    settings.cardDepthPostersEnabled,
+    settings.cardDepthContinueWatchingEnabled,
+    settings.cardDepthEpisodeCardsEnabled,
+    settings.cardDepthCastEnabled,
+    settings.cardDepthTrailersEnabled,
+    settings.cardDepthEdgeStrength,
+    settings.cardDepthEdgeCoverage,
+    settings.cardDepthSheenStrength
+  ].join("|");
+  if (key === appliedCardDepthKey && root.dataset.cardDepth) return;
+  appliedCardDepthKey = key;
   root.dataset.cardDepth = settings.cardDepthEnabled ? "true" : "false";
   root.dataset.cardDepthPosters = settings.cardDepthPostersEnabled !== false ? "true" : "false";
   root.dataset.cardDepthContinueWatching =
