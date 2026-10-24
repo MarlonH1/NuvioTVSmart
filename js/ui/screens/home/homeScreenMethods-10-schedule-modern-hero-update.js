@@ -26,7 +26,8 @@ export function createHomeScreenMethods10() {
       const now = Date.now();
       const previous = Number(this.lastModernHeroNavAt || 0);
       const isRapidNav = previous > 0 && now - previous < MODERN_HOME_CONSTANTS.heroRapidNavThresholdMs;
-      const delay = immediate ? 0 : this.getHeroFocusDelay({ rapid: isRapidNav });
+      const isSteadyNav = previous > 0 && now - previous < MODERN_HOME_CONSTANTS.heroSteadyNavWindowMs;
+      const delay = immediate ? 0 : this.getHeroFocusDelay({ rapid: isRapidNav, steady: isSteadyNav });
       this.lastModernHeroNavAt = now;
       if (isRapidNav || immediate) {
         this.container?.querySelector(".home-modern-hero-card")?.classList.add("is-hero-focus-pending");
@@ -43,7 +44,12 @@ export function createHomeScreenMethods10() {
         }
         callback();
       };
-      const preloadDelay = Math.max(0, Math.min(120, delay - 80));
+      // While scrolling, every passed card would otherwise start loading a full-screen backdrop.
+      // Starting shortly before the swap still has it decoded in time for a smooth fade.
+      const preloadDelay =
+        isSteadyNav && !immediate
+          ? Math.max(0, delay - MODERN_HOME_CONSTANTS.heroSteadyPreloadLeadMs)
+          : Math.max(0, Math.min(120, delay - 80));
       this.heroBackdropPreloadTimer = setTimeout(() => {
         this.heroBackdropPreloadTimer = null;
         waitForVerticalSettle(() => {

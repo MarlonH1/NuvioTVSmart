@@ -38,6 +38,7 @@ export function createHomeScreenMethods05() {
       if (!display) {
         return;
       }
+      const heroChanged = heroNode.dataset.itemId !== (hero?.id || "") || heroNode.dataset.itemType !== (hero?.type || "movie");
       heroNode.dataset.itemId = hero?.id || "";
       heroNode.dataset.itemType = hero?.type || "movie";
       heroNode.dataset.itemTitle = hero?.name || "Untitled";
@@ -143,6 +144,15 @@ export function createHomeScreenMethods05() {
       if (descriptionNode) {
         descriptionNode.textContent = display.description || " ";
         descriptionNode.classList.toggle("is-empty", !display.description);
+      }
+      // The backdrop and logo crossfade; fade the new text in with them instead of a hard cut.
+      // An opacity animation runs on the compositor, so it adds no work to the main thread.
+      const copyNode = heroNode.querySelector(".home-modern-hero-copy");
+      if (heroChanged && heroTransitionMode === "crossfade" && typeof copyNode?.animate === "function") {
+        copyNode.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: Math.round(heroCrossfadeMs * 0.75),
+          easing: "ease-out"
+        });
       }
       const mdbRow = heroNode.querySelector(".home-hero-mdb-ratings");
       if (mdbRow) {

@@ -4,6 +4,12 @@ export const MODERN_HOME_CONSTANTS = {
   heroFocusDelayMs: 450,
   heroRapidNavThresholdMs: 130,
   heroRapidSettleMs: 400,
+  // Steps closer together than this count as scrolling through a row: the hero waits for a
+  // longer pause, so its swap (a few dozen ms of work) does not land on the next key press.
+  heroSteadyNavWindowMs: 1200,
+  heroSteadyNavSettleMs: 1000,
+  // How early before the swap the next hero's images start loading while scrolling.
+  heroSteadyPreloadLeadMs: 350,
   keyRepeatThrottleMs: 80,
   verticalKeyRepeatThrottleMs: 112,
   trackPaginationIdleMs: 160,

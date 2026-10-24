@@ -116,9 +116,12 @@ export function createHomeScreenMethods04() {
   } = internals;
 
   return {
-    getHeroFocusDelay({ rapid = false } = {}) {
+    getHeroFocusDelay({ rapid = false, steady = false } = {}) {
       if (this.isLegacyTvRuntime()) {
         return rapid ? 260 : 150;
+      }
+      if (steady) {
+        return MODERN_HOME_CONSTANTS.heroSteadyNavSettleMs;
       }
       return rapid ? MODERN_HOME_CONSTANTS.heroRapidSettleMs : MODERN_HOME_CONSTANTS.heroFocusDelayMs;
     },
