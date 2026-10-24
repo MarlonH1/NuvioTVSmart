@@ -30,7 +30,10 @@ export function createPlayerScreenMethods28() {
       const nextEpisode = this.resolveNextEpisodeInfo();
       const available = {};
 
-      if (nextEpisode?.hasAired && !this.nextEpisodeLaunching) {
+      // Stays while the next episode is launching: dropping it shifted the following buttons
+      // under the focus, so the subtitles button lit up for a moment (playNextEpisode ignores
+      // repeated presses while launching).
+      if (nextEpisode?.hasAired) {
         available.playNextEpisode = {
           action: "playNextEpisode",
           icon: "assets/icons/ic_player_skip_next.svg",
@@ -172,9 +175,17 @@ export function createPlayerScreenMethods28() {
       if (this.stickyProgressFocus && this.controlsVisible && !this.isDialogOpen() && this.isSeekBarAvailable()) {
         this.controlFocusZone = "progress";
       }
+      const mountedButtons = Array.from(wrap.querySelectorAll(".player-control-btn"));
+      // When buttons appear or disappear, keep the focus on the button the user sees focused
+      // instead of on its old position. Only when the index still matches the painted focus,
+      // so a focus move that is just being rendered is not undone.
+      const paintedIndex = mountedButtons.findIndex((button) => button.classList.contains("focused"));
+      if (paintedIndex >= 0 && paintedIndex === this.controlFocusIndex) {
+        const anchoredIndex = controls.findIndex((control) => control.action === mountedButtons[paintedIndex].dataset.action);
+        if (anchoredIndex >= 0) this.controlFocusIndex = anchoredIndex;
+      }
       this.controlFocusIndex = clamp(this.controlFocusIndex, 0, Math.max(0, controls.length - 1));
 
-      const mountedButtons = Array.from(wrap.querySelectorAll(".player-control-btn"));
       const controlsMatchDom =
         mountedButtons.length === controls.length &&
         mountedButtons.every((button, index) => button.dataset.action === String(controls[index]?.action || ""));
