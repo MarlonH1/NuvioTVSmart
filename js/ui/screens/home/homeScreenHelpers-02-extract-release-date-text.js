@@ -318,7 +318,8 @@ export function prepareHeroImageEnter(image, enterClass) {
   image.style.setProperty("transition", "none", "important");
   image.classList.remove("is-visible");
   image.classList.add(enterClass);
-  void image.offsetWidth;
+  // Resolving the style commits the reset; offsetWidth also forced a layout of the whole Home.
+  void getComputedStyle(image).opacity;
   if (transition) {
     image.style.setProperty("transition", transition, priority);
   } else {

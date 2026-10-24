@@ -65,7 +65,37 @@ function normalizeEnvelopeProfiles(profiles = {}, normalize) {
   return normalized;
 }
 
+// Settings are read many times per frame on Home (every LayoutPreferences.get()). Parsing and
+// normalizing the stored JSON each time showed up while navigating, so the envelope is reused
+// while the stored text is unchanged. Every write drops it (persistEnvelope / LocalStore.set).
+const envelopeCache = new Map();
+
+function readStoredText(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (_) {
+    return undefined;
+  }
+}
+
 function readEnvelope(key, normalize, legacyProfileIds = null) {
+  const storedText = readStoredText(key);
+  const cached = envelopeCache.get(key);
+  if (
+    cached &&
+    storedText !== undefined &&
+    cached.text === storedText &&
+    cached.normalize === normalize
+  ) {
+    return cached.envelope;
+  }
+  const envelope = readEnvelopeFromStorage(key, normalize, legacyProfileIds);
+  const text = readStoredText(key);
+  if (text !== undefined) envelopeCache.set(key, { text, normalize, envelope });
+  return envelope;
+}
+
+function readEnvelopeFromStorage(key, normalize, legacyProfileIds = null) {
   const raw = LocalStore.get(key, null);
   if (isProfileScopedEnvelope(raw)) {
     const next = {
@@ -95,6 +125,7 @@ function readEnvelope(key, normalize, legacyProfileIds = null) {
 }
 
 function persistEnvelope(key, envelope) {
+  envelopeCache.delete(key);
   LocalStore.set(key, envelope);
 }
 
