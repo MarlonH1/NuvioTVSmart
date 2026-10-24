@@ -280,8 +280,21 @@
   background: var(--card-bg) center center / cover no-repeat;
   background-origin: border-box;
   background-clip: border-box;
-  /* No focus transition: animating the border repaints the poster image every frame, and
-     TVs decode it again each time (half-second stalls while moving through a grid). */
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+/* The focus fade repaints the poster every frame. On its own layer the TV keeps the decoded
+   image; without one it decoded it again per frame (half-second stalls in grids). Weak TVs
+   skip the fade instead of paying for a layer per poster. */
+html:not(.performance-constrained):not(.legacy-tizen) .library-grid-poster {
+  will-change: transform;
+}
+
+html.performance-constrained .library-grid-poster,
+html.legacy-tizen .library-grid-poster {
+  transition: none;
 }
 
 .library-grid-poster.placeholder {

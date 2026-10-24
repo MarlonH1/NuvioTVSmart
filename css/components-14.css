@@ -367,8 +367,22 @@
     linear-gradient(145deg, #393939, #111);
   background-position: center;
   background-size: cover;
-  /* No focus transition: animating the border repaints the poster image every frame, and
-     TVs decode it again each time (half-second stalls while moving through a grid). */
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+/* The focus fade repaints the poster every frame. On its own layer the TV keeps the decoded
+   image; without one it decoded it again per frame (half-second stalls in grids). Weak TVs
+   skip the fade instead of paying for a layer per poster. */
+html:not(.performance-constrained):not(.legacy-tizen) .home-screen-shell .home-continue-media {
+  will-change: transform;
+}
+
+html.performance-constrained .home-screen-shell .home-continue-media,
+html.legacy-tizen .home-screen-shell .home-continue-media {
+  transition: none;
 }
 
 .home-screen-shell .home-continue-bg {
