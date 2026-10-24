@@ -271,10 +271,8 @@
   border-radius: clamp(20px, 1.3vw, 26px);
   background: var(--detail-bg-card) center center / cover no-repeat;
   overflow: hidden;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease;
+  /* No focus transition: animating the border repaints the poster image every frame, and
+     TVs decode it again each time (half-second stalls while moving through a grid). */
 }
 
 .series-episode-image {

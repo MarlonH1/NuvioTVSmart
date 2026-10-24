@@ -367,10 +367,8 @@
     linear-gradient(145deg, #393939, #111);
   background-position: center;
   background-size: cover;
-  transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    background-color 140ms ease;
+  /* No focus transition: animating the border repaints the poster image every frame, and
+     TVs decode it again each time (half-second stalls while moving through a grid). */
 }
 
 .home-screen-shell .home-continue-bg {

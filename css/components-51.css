@@ -464,10 +464,8 @@ html.tizen-tv.no-css-math .plugins-route-shell {
   border-radius: 14px;
   background: var(--card-bg) center center / cover no-repeat;
   box-sizing: border-box;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease;
+  /* No focus transition: animating the border repaints the poster image every frame, and
+     TVs decode it again each time (half-second stalls while moving through a grid). */
 }
 
 .cast-credit-card.focused .cast-credit-poster {

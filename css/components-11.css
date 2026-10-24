@@ -280,9 +280,8 @@
   background: var(--card-bg) center center / cover no-repeat;
   background-origin: border-box;
   background-clip: border-box;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
+  /* No focus transition: animating the border repaints the poster image every frame, and
+     TVs decode it again each time (half-second stalls while moving through a grid). */
 }
 
 .library-grid-poster.placeholder {
