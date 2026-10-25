@@ -56,6 +56,7 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.webOsAddonSubtitleRestoreRequestId = 0;
   this.pendingWebOsAddonSubtitleRestore = null;
   this.startupSubtitlePreferenceApplied = false;
+  this.subtitleUserSelected = false;
   this.startupSubtitlePreferenceApplying = false;
   this.startupAudioPreferenceApplied = false;
   this.startupAudioPreferenceApplying = false;

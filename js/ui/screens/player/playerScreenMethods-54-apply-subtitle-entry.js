@@ -76,6 +76,9 @@ export function createPlayerScreenMethods54() {
       }
       if (!this.startupSubtitlePreferenceApplying) {
         this.startupSubtitlePreferenceApplied = true;
+        // A choice by the user (dialog, remote) is final for this playback; see
+        // applyStartupSubtitlePreference.
+        this.subtitleUserSelected = true;
       }
       const selectionToken = Number(this.subtitleSelectionToken || 0) + 1;
       this.subtitleSelectionToken = selectionToken;

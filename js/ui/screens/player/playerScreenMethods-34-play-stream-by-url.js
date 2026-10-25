@@ -199,6 +199,7 @@ export function createPlayerScreenMethods34() {
         this.selectedManifestSubtitleTrackId = null;
         this.startupSubtitlePreferenceApplied = false;
         this.startupSubtitlePreferenceApplying = false;
+        this.subtitleUserSelected = false;
         this.startupAudioPreferenceApplied = false;
         this.startupAudioPreferenceApplying = false;
         this.startupAudioFallbackApplied = false;

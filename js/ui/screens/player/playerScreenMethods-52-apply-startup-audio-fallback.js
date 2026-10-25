@@ -252,6 +252,12 @@ export function createPlayerScreenMethods52() {
       if (this.startupSubtitlePreferenceApplied || this.startupSubtitlePreferenceApplying) {
         return false;
       }
+      // Later track discovery (audio confirmed, addon subtitles arriving) re-opens the startup
+      // pass; it must never replace a subtitle the user picked themselves.
+      if (this.subtitleUserSelected) {
+        this.startupSubtitlePreferenceApplied = true;
+        return false;
+      }
 
       const configuredPreferenceMode = this.getStartupSubtitlePreferenceMode();
       const preferredSubtitleTargets = this.getStartupAutoSelectSubtitleLanguageTargets();
@@ -336,11 +342,8 @@ export function createPlayerScreenMethods52() {
 
         const addonDiscoveryPending = Boolean(this.subtitleLoading || (!this.subtitles?.length && this.trackDiscoveryInProgress));
         if (addonDiscoveryPending) {
-          const provisionalOption =
-            this.findRememberedInternalSubtitleOption(rememberedSubtitle, { languageOnly: true })?.option || preferredOption;
-          if (provisionalOption && !provisionalOption.selected) {
-            this.applyStartupRememberedSubtitleOption(provisionalOption);
-          }
+          // Wait for the remembered addon subtitle instead of showing a built-in track of the
+          // same language first: that swapped subtitles mid-playback once the addon arrived.
           this.startupSubtitlePreferenceApplied = false;
           return false;
         }
