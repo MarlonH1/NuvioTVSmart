@@ -426,6 +426,26 @@ test("play while the TV is off waits until it is woken", async () => {
   }
 });
 
+test("phones learn when the TV goes to standby and wakes up", async () => {
+  const env = await setup();
+  try {
+    const { phone } = await pairPhone(env);
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.webos.app.home" });
+    env.tv.presence({ poweredOn: false, foregroundAppId: "com.webos.app.home" });
+    assert.strictEqual(
+      (await phone.next("state", (m) => m.tvPoweredOn === false)).tvPoweredOn,
+      false
+    );
+    env.tv.presence({ poweredOn: true, foregroundAppId: "com.webos.app.home" });
+    assert.strictEqual(
+      (await phone.next("state", (m) => m.tvPoweredOn === true)).tvPoweredOn,
+      true
+    );
+  } finally {
+    env.teardown();
+  }
+});
+
 test("an input that takes over right after a play launch brings Nuvio back, twice at most", async () => {
   const env = await setup();
   try {

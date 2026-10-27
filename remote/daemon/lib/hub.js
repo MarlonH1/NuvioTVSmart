@@ -201,7 +201,26 @@ function createHub(deps) {
     return state.status === "playing" || state.status === "buffering" ? frozen(state, at) : state;
   }
 
+  // Phones show the power button as "turn on" while the TV is off but the hub still answers
+  // (standby with Quick Start); they wake it with Wake-on-LAN then.
+  function stateMessage() {
+    return { type: "state", playback: playback, tvPoweredOn: presence.poweredOn !== false };
+  }
+
   function setPresence(next) {
+    var wasOff = presence.poweredOn === false;
+    var playbackBefore = playback;
+    try {
+      applyPresence(next);
+    } finally {
+      // A playback change already carried the new power state to the phones.
+      if (wasOff !== (presence.poweredOn === false) && playback === playbackBefore) {
+        broadcast(stateMessage());
+      }
+    }
+  }
+
+  function applyPresence(next) {
     var wasVisible = appVisible();
     var wasOff = presence.poweredOn === false;
     var previousApp = presence.foregroundAppId;
@@ -250,7 +269,7 @@ function createHub(deps) {
   function setPlayback(next) {
     var wasActive = isActive(playback);
     playback = next;
-    broadcast({ type: "state", playback: playback });
+    broadcast(stateMessage());
     if (wasActive !== isActive(playback)) notifyWatchers();
   }
 
@@ -533,7 +552,7 @@ function createHub(deps) {
           protocol: PROTOCOL_VERSION
         });
         if (phone.paired) {
-          send(phone.connection, { type: "state", playback: playback });
+          send(phone.connection, stateMessage());
           sendParty(phone);
         }
         return;
@@ -547,7 +566,7 @@ function createHub(deps) {
         reply(phone, request, { type: "pong", t: request.t, serverTime: now() });
         return;
       case "state.get":
-        reply(phone, request, { type: "state", playback: playback });
+        reply(phone, request, stateMessage());
         sendParty(phone);
         if (app) send(app, { type: "state.get" });
         return;
@@ -657,7 +676,7 @@ function createHub(deps) {
 
   var heartbeat = setInterval(function () {
     if (playback.status === "playing" || playback.status === "buffering") {
-      broadcast({ type: "state", playback: playback });
+      broadcast(stateMessage());
     }
   }, STATE_HEARTBEAT_MS);
   if (typeof heartbeat.unref === "function") heartbeat.unref();
