@@ -6,7 +6,8 @@ export function createPlayerControllerMethods19() {
     CloudLibraryPlaybackProgressStore,
     CloudLibraryPlaybackSessionStore,
     cloudPlaybackFileForSession,
-    MIN_PROGRESS_SYNC_DURATION_MS
+    MIN_PROGRESS_SYNC_DURATION_MS,
+    isPlaybackPositionComplete
   } = internals;
 
   return {
@@ -298,7 +299,7 @@ export function createPlayerControllerMethods19() {
       const safeDuration = Number(durationMs || 0);
       const hasFiniteDuration = Number.isFinite(safeDuration) && safeDuration > 0;
       const hasReachedMinimumSyncPosition = Number.isFinite(safePosition) && safePosition >= MIN_PROGRESS_SYNC_DURATION_MS;
-      const isCompleted = hasFiniteDuration && safePosition / safeDuration >= 0.9;
+      const isCompleted = hasFiniteDuration && isPlaybackPositionComplete(safePosition, safeDuration, this.creditsStartMs);
       if (safePosition > 0) {
         this.recordProgressSnapshot(safePosition, safeDuration, active);
       }

@@ -1,3 +1,4 @@
+import { WATCH_PROGRESS_COMPLETED_THRESHOLD } from "../../domain/model/watchProgress.js";
 import { LocalStore } from "../../core/storage/localStore.js";
 import { ProfileManager } from "../../core/profile/profileManager.js";
 
@@ -5,7 +6,7 @@ const SESSION_KEY = "cloudLibraryPlaybackSessions";
 const PROGRESS_KEY = "cloudLibraryPlaybackProgress";
 const MAX_SESSIONS = 8;
 const MIN_RESUME_POSITION_MS = 1000;
-const COMPLETED_FRACTION = 0.9;
+const COMPLETED_FRACTION = WATCH_PROGRESS_COMPLETED_THRESHOLD;
 
 function activeProfileId() {
   return String(ProfileManager.getActiveProfileId() || "1");

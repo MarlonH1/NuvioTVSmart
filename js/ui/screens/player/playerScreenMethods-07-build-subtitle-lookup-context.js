@@ -2,8 +2,26 @@ import { resolveStreamFilename } from "./streamFilename.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
+const CREDITS_SEGMENT_TYPES = new Set(["outro", "ed", "ending", "mixed-ed", "credits", "movie-credits"]);
+
+// Start of the end credits in ms (earliest outro / movie credits segment), or null.
+function creditsStartMsOf(intervals = []) {
+  const starts = intervals
+    .filter((interval) =>
+      CREDITS_SEGMENT_TYPES.has(
+        String(interval?.type || "")
+          .trim()
+          .toLowerCase()
+      )
+    )
+    .map((interval) => Number(interval?.startTime))
+    .filter((start) => Number.isFinite(start) && start > 0);
+  return starts.length ? Math.round(Math.min(...starts) * 1000) : null;
+}
+
 export function createPlayerScreenMethods07() {
   const {
+    PlayerController,
     parentalGuideRepository,
     skipIntroRepository,
     PlayerSettingsStore,
@@ -318,6 +336,8 @@ export function createPlayerScreenMethods07() {
     async fetchSkipIntervals() {
       const requestToken = (this.skipIntervalsRequestToken || 0) + 1;
       this.skipIntervalsRequestToken = requestToken;
+      // Reaching the credits counts as watched (isPlaybackPositionComplete); unknown until loaded.
+      PlayerController.creditsStartMs = null;
       if (!PlayerSettingsStore.get().skipIntroEnabled) {
         this.skipIntervals = [];
         this.activeSkipInterval = null;
@@ -365,6 +385,7 @@ export function createPlayerScreenMethods07() {
         return;
       }
       this.skipIntervals = Array.isArray(intervals) ? intervals : [];
+      PlayerController.creditsStartMs = creditsStartMsOf(this.skipIntervals);
       this.skipIntervalDismissed = false;
       this.skipIntroAutoHidden = false;
       this.skipIntroCountdownProgress = 0;

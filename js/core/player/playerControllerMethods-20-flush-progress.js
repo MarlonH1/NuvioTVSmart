@@ -9,6 +9,7 @@ export function createPlayerControllerMethods20() {
     WatchProgressSyncService,
     isShortPlaceholderDuration,
     WATCH_PROGRESS_UNKNOWN_DURATION_PERCENT,
+    isPlaybackPositionComplete,
     MIN_PROGRESS_SYNC_DURATION_MS
   } = internals;
 
@@ -45,7 +46,7 @@ export function createPlayerControllerMethods20() {
       }
       const hasFiniteDuration = Number.isFinite(safeDuration) && safeDuration > 0;
       const hasReachedMinimumSyncPosition = Number.isFinite(safePosition) && safePosition >= MIN_PROGRESS_SYNC_DURATION_MS;
-      const isCompleted = hasFiniteDuration && safePosition / safeDuration >= 0.9;
+      const isCompleted = hasFiniteDuration && isPlaybackPositionComplete(safePosition, safeDuration, this.creditsStartMs);
       if (safePosition > 0) {
         this.recordProgressSnapshot(safePosition, safeDuration, active);
       }

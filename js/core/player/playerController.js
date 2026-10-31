@@ -23,7 +23,10 @@ import { WebOsLunaService } from "../../platform/webos/webosLunaService.js";
 import { subscribeWebOsCompanionService } from "../../platform/webos/webosCompanionService.js";
 import { WebOSPlayerExtensions } from "../../platform/webos/webosPlayerExtensions.js";
 import { loadStreamingLibs } from "../../runtime/loadStreamingLibs.js";
-import { WATCH_PROGRESS_UNKNOWN_DURATION_PERCENT } from "../../domain/model/watchProgress.js";
+import {
+  WATCH_PROGRESS_UNKNOWN_DURATION_PERCENT,
+  isPlaybackPositionComplete
+} from "../../domain/model/watchProgress.js";
 import { parseAspectRatio } from "./playerAspect.js";
 
 import { createPlayerControllerMethods01 } from "./playerControllerMethods-01-is-expected-play-interruption.js";
@@ -92,6 +95,7 @@ export {
   WebOSPlayerExtensions,
   loadStreamingLibs,
   WATCH_PROGRESS_UNKNOWN_DURATION_PERCENT,
+  isPlaybackPositionComplete,
   parseAspectRatio,
   MIN_PROGRESS_SYNC_DURATION_MS,
   WATCH_PROGRESS_SAVE_INTERVAL_MS,

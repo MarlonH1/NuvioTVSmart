@@ -17,13 +17,35 @@ export function createWatchProgress({
 }
 
 export const WATCH_PROGRESS_STARTED_THRESHOLD = 0.02;
-export const WATCH_PROGRESS_COMPLETED_THRESHOLD = 0.9;
+// Watched from 85%: between Trakt (80%) and Plex/Jellyfin (90% by default). A known credits
+// start also counts, see isPlaybackPositionComplete.
+export const WATCH_PROGRESS_COMPLETED_THRESHOLD = 0.85;
 // Simkl playback sessions report completion earlier than local progress, so
 // Android treats them as finished at 80% instead of 90%.
 export const WATCH_PROGRESS_SIMKL_COMPLETED_THRESHOLD = 0.8;
 // Android keeps a small in-progress marker when a player cannot expose a
 // meaningful duration (the usual case for live streams).
 export const WATCH_PROGRESS_UNKNOWN_DURATION_PERCENT = 5;
+
+/**
+ * Whether playback at positionMs counts as watched: from the completion threshold on, or once
+ * the end credits started (creditsStartMs from skip segments). Only credits in the second half
+ * are trusted, so a mislabelled segment cannot finish an episode early.
+ */
+export function isPlaybackPositionComplete(positionMs, durationMs, creditsStartMs = null) {
+  const position = Number(positionMs || 0);
+  const duration = Number(durationMs || 0);
+  if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position)) return false;
+  if (position / duration >= WATCH_PROGRESS_COMPLETED_THRESHOLD) return true;
+  const credits = Number(creditsStartMs);
+  return (
+    creditsStartMs != null &&
+    Number.isFinite(credits) &&
+    credits >= duration / 2 &&
+    credits < duration &&
+    position >= credits
+  );
+}
 
 export function watchProgressCompletedThreshold(progress = {}) {
   return String(progress?.source || "") === "simkl_playback"
