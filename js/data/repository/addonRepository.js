@@ -409,11 +409,9 @@ class AddonRepository {
     );
   }
 
-  isAddonEnabled(url) {
+  isAddonEnabled(url, enabledStates = this.getAddonEnabledStates()) {
     const cleanUrl = this.normalizeCinemetaUrl(this.canonicalizeUrl(url));
-    return cleanUrl
-      ? this.getAddonMapValue(this.getAddonEnabledStates(), cleanUrl) !== false
-      : false;
+    return cleanUrl ? this.getAddonMapValue(enabledStates, cleanUrl) !== false : false;
   }
 
   getAddonMapValue(map, url) {
@@ -662,11 +660,11 @@ class AddonRepository {
     const includeDisabled = Boolean(options?.includeDisabled);
     const allUrls = this.getInstalledAddonUrls();
     const enabledStates = this.getAddonEnabledStates();
-    // Same check as isAddonEnabled(), against the states read once above: re-reading and
-    // normalizing the stored states for every addon dominated Home startup.
+    // The states are read once above: re-reading and normalizing them for every addon dominated
+    // Home startup.
     const urls = includeDisabled
       ? allUrls
-      : allUrls.filter((url) => this.getAddonMapValue(enabledStates, url) !== false);
+      : allUrls.filter((url) => this.isAddonEnabled(url, enabledStates));
     const cacheKey = JSON.stringify({
       profileId: this.getActiveStorageProfileId(),
       urls,
