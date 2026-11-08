@@ -1,4 +1,8 @@
-const LATEST_RELEASE_URL = "https://api.github.com/repos/NuvioMedia/NuvioTVSmart/releases/latest";
+// This fork checks its own releases, not upstream NuvioMedia/NuvioTVSmart, so the
+// official (higher-numbered) releases never show up as "updates" for the fork.
+// The fork tags its builds "webos-v<version>"; only those tags count.
+const RELEASES_URL = "https://api.github.com/repos/MarlonH1/NuvioTVSmart/releases?per_page=20";
+const RELEASE_TAG_PATTERN = /^webos-v\d/i;
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_RETRY_DELAY_MS = 2000;
 const DEFAULT_MAX_ATTEMPTS = 2;
@@ -6,6 +10,7 @@ const DEFAULT_MAX_ATTEMPTS = 2;
 export function normalizeAppVersion(raw) {
   return String(raw || "")
     .trim()
+    .replace(/^webos-/i, "")
     .replace(/^[vV]/, "");
 }
 
@@ -70,6 +75,20 @@ export function parseLatestRelease(release) {
   };
 }
 
+export function pickLatestRelease(releases) {
+  let best = null;
+  for (const raw of Array.isArray(releases) ? releases : []) {
+    const release = parseLatestRelease(raw);
+    if (!release || !RELEASE_TAG_PATTERN.test(release.tag)) {
+      continue;
+    }
+    if (!best || isRemoteAppVersionNewer(release.tag, best.tag)) {
+      best = release;
+    }
+  }
+  return best;
+}
+
 export async function getLatestAppUpdate({
   currentVersion,
   fetchImpl = globalThis.fetch,
@@ -84,7 +103,7 @@ export async function getLatestAppUpdate({
   let timeoutId = null;
 
   try {
-    const request = fetchImpl(LATEST_RELEASE_URL, {
+    const request = fetchImpl(RELEASES_URL, {
       method: "GET",
       headers: {
         Accept: "application/vnd.github+json"
@@ -111,7 +130,7 @@ export async function getLatestAppUpdate({
       throw error;
     }
 
-    const release = parseLatestRelease(await response.json());
+    const release = pickLatestRelease(await response.json());
     if (!release || !isRemoteAppVersionNewer(release.tag, currentVersion)) {
       return null;
     }
