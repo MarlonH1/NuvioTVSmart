@@ -22,6 +22,10 @@ export function createPlayerScreenMethods48() {
       const selectedHlsSubtitleTrack =
         typeof PlayerController.getSelectedHlsSubtitleTrackIndex === "function" ? PlayerController.getSelectedHlsSubtitleTrackIndex() : -1;
       const embeddedSubtitleTracks = this.shouldUseEmbeddedSubtitleTracks() ? this.embeddedSubtitleTracks : [];
+      // One subtitle source is active at a time. While an addon subtitle is the
+      // selection, a built-in track the native player still reports (AVPlay
+      // keeps its TEXT index until the addon file is loaded) is not selected.
+      const builtInSelectable = !this.selectedAddonSubtitleId;
 
       const builtInTracks = this.dedupeBuiltInSubtitleTracks(
         textTracks.filter((_, index) => index < builtInBoundary),
@@ -59,7 +63,7 @@ export function createPlayerScreenMethods48() {
                 languageLabel: display.languageLabel,
                 track: mergedTrack,
                 isForced: isForcedSubtitleTrack(mergedTrack),
-                selected: normalizedTrackIndex === selectedAvPlaySubtitleTrack,
+                selected: builtInSelectable && normalizedTrackIndex === selectedAvPlaySubtitleTrack,
                 disabled: dashTextSwitchingUnsupported || mergedTrack.supported === false,
                 unsupportedReason: dashTextSwitchingUnsupported ? "tizen-dash-text" : unsupportedReason,
                 trackIndex: null,
@@ -90,7 +94,7 @@ export function createPlayerScreenMethods48() {
                 languageLabel: display.languageLabel,
                 track,
                 isForced: isForcedSubtitleTrack(track),
-                selected: index === selectedDashSubtitleTrack,
+                selected: builtInSelectable && index === selectedDashSubtitleTrack,
                 trackIndex: null,
                 dashSubtitleTrackIndex: index
               };
@@ -119,7 +123,7 @@ export function createPlayerScreenMethods48() {
                 languageLabel: display.languageLabel,
                 track,
                 isForced: isForcedSubtitleTrack(track),
-                selected: index === selectedHlsSubtitleTrack,
+                selected: builtInSelectable && index === selectedHlsSubtitleTrack,
                 trackIndex: null,
                 hlsSubtitleTrackIndex: index
               };
@@ -147,7 +151,7 @@ export function createPlayerScreenMethods48() {
               languageLabel: display.languageLabel,
               track,
               isForced: isForcedSubtitleTrack(track),
-              selected: track.embeddedTrackIndex === this.selectedEmbeddedSubtitleTrackIndex,
+              selected: builtInSelectable && track.embeddedTrackIndex === this.selectedEmbeddedSubtitleTrackIndex,
               disabled: support.supported === false,
               unsupportedReason: support.unsupportedReason,
               trackIndex: null,
@@ -166,7 +170,7 @@ export function createPlayerScreenMethods48() {
               languageLabel: display.languageLabel,
               track,
               isForced: isForcedSubtitleTrack(track),
-              selected: this.selectedEmbeddedSubtitleTrackIndex < 0 && index === this.selectedSubtitleTrackIndex,
+              selected: builtInSelectable && this.selectedEmbeddedSubtitleTrackIndex < 0 && index === this.selectedSubtitleTrackIndex,
               disabled: support.supported === false,
               unsupportedReason: support.unsupportedReason,
               trackIndex: index
@@ -183,7 +187,7 @@ export function createPlayerScreenMethods48() {
               languageLabel: display.languageLabel,
               track,
               isForced: isForcedSubtitleTrack(track),
-              selected: this.selectedManifestSubtitleTrackId === track.id,
+              selected: builtInSelectable && this.selectedManifestSubtitleTrackId === track.id,
               trackIndex: null,
               manifestSubtitleTrackId: track.id
             };

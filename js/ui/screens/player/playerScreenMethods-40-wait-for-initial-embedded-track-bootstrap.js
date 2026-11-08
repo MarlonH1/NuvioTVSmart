@@ -75,7 +75,9 @@ export function createPlayerScreenMethods40() {
           typeof PlayerController.getSelectedWebOsEmbeddedAudioTrackIndex === "function"
             ? PlayerController.getSelectedWebOsEmbeddedAudioTrackIndex()
             : -1;
-        this.selectedEmbeddedSubtitleTrackIndex = Number.isFinite(selectedEmbeddedSubtitleTrack) ? selectedEmbeddedSubtitleTrack : -1;
+        // Track discovery can finish after an addon subtitle was chosen.
+        this.selectedEmbeddedSubtitleTrackIndex =
+          !this.selectedAddonSubtitleId && Number.isFinite(selectedEmbeddedSubtitleTrack) ? selectedEmbeddedSubtitleTrack : -1;
         this.selectedEmbeddedAudioTrackIndex = Number.isFinite(selectedEmbeddedAudioTrack) ? selectedEmbeddedAudioTrack : -1;
         this.refreshTrackDialogs();
       })()

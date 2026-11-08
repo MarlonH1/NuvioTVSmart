@@ -636,10 +636,10 @@ function trackLang(entry) {
   return entry.languageKey || entry.language || entry.track?.lang || entry.track?.language || null;
 }
 
-function subtitleSource(entry) {
-  if (entry.fallbackAddonSubtitle)
-    return entry.track?.addonName === "Nuvio Remote" ? "external" : "addon";
-  return "embedded";
+// The tab is the source: addon tracks mounted as text tracks carry no fallbackAddonSubtitle flag.
+function subtitleSource(entry, tab) {
+  if (tab !== "addons") return "embedded";
+  return entry.track?.addonName === "Nuvio Remote" ? "external" : "addon";
 }
 
 export function readPlaybackState(player) {
@@ -653,13 +653,15 @@ export function readPlaybackState(player) {
       selected: Boolean(entry.selected)
     }));
   const subtitleTracks = ["builtIn", "addons"]
-    .flatMap((tab) => safe(() => player.getSubtitleEntries(tab), []) || [])
-    .filter((entry) => entry && !entry.disabled && entry.trackIndex !== -1 && entry.id)
-    .map((entry) => ({
+    .flatMap((tab) =>
+      (safe(() => player.getSubtitleEntries(tab), []) || []).map((entry) => ({ entry, tab }))
+    )
+    .filter(({ entry }) => entry && !entry.disabled && entry.trackIndex !== -1 && entry.id)
+    .map(({ entry, tab }) => ({
       id: entry.id,
       label: entry.label || entry.id,
       lang: trackLang(entry),
-      source: subtitleSource(entry),
+      source: subtitleSource(entry, tab),
       selected: Boolean(entry.selected)
     }));
   const status = playerStatus(player);

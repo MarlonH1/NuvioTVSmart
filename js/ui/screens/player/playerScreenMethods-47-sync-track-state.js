@@ -29,28 +29,37 @@ export function createPlayerScreenMethods47() {
         this.builtInSubtitleCount = textTracks.length - this.externalTrackNodes.length;
       }
 
+      // The native player keeps reporting its last built-in track until an
+      // addon subtitle has replaced it; the addon choice wins meanwhile.
+      const addonSubtitleSelected = Boolean(this.selectedAddonSubtitleId);
+
       if (avplaySubtitleTracks.length) {
         this.selectedEmbeddedSubtitleTrackIndex = -1;
         const selectedAvPlaySubtitleTrack =
           typeof PlayerController.getSelectedAvPlaySubtitleTrackIndex === "function"
             ? PlayerController.getSelectedAvPlaySubtitleTrackIndex()
             : -1;
-        this.selectedSubtitleTrackIndex = Number.isFinite(selectedAvPlaySubtitleTrack) ? selectedAvPlaySubtitleTrack : -1;
+        this.selectedSubtitleTrackIndex =
+          !addonSubtitleSelected && Number.isFinite(selectedAvPlaySubtitleTrack) ? selectedAvPlaySubtitleTrack : -1;
       } else if (dashSubtitleTracks.length) {
         this.selectedEmbeddedSubtitleTrackIndex = -1;
         const selectedDashSubtitleTrack =
           typeof PlayerController.getSelectedDashTextTrackIndex === "function" ? PlayerController.getSelectedDashTextTrackIndex() : -1;
-        this.selectedSubtitleTrackIndex = Number.isFinite(selectedDashSubtitleTrack) ? selectedDashSubtitleTrack : -1;
+        this.selectedSubtitleTrackIndex =
+          !addonSubtitleSelected && Number.isFinite(selectedDashSubtitleTrack) ? selectedDashSubtitleTrack : -1;
       } else if (hlsSubtitleTracks.length) {
         this.selectedEmbeddedSubtitleTrackIndex = -1;
         const selectedHlsSubtitleTrack =
           typeof PlayerController.getSelectedHlsSubtitleTrackIndex === "function"
             ? PlayerController.getSelectedHlsSubtitleTrackIndex()
             : -1;
-        this.selectedSubtitleTrackIndex = Number.isFinite(selectedHlsSubtitleTrack) ? selectedHlsSubtitleTrack : -1;
+        this.selectedSubtitleTrackIndex =
+          !addonSubtitleSelected && Number.isFinite(selectedHlsSubtitleTrack) ? selectedHlsSubtitleTrack : -1;
         this.selectedManifestSubtitleTrackId = null;
       } else if (this.shouldUseEmbeddedSubtitleTracks()) {
-        if (!this.bitmapSubtitleTrack) {
+        if (addonSubtitleSelected) {
+          this.selectedEmbeddedSubtitleTrackIndex = -1;
+        } else if (!this.bitmapSubtitleTrack) {
           this.selectedEmbeddedSubtitleTrackIndex = Number.isFinite(selectedEmbeddedSubtitleTrack) ? selectedEmbeddedSubtitleTrack : -1;
         }
         this.selectedSubtitleTrackIndex = -1;
