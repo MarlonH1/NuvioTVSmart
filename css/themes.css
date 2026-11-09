@@ -1,0 +1,43 @@
+/* ---- Anime filler markers (ported from NuvioCodeineXO) ---------------------------------- */
+.anime-episode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3vw;
+  margin-left: 0.5vw;
+  padding: 0.15vw 0.45vw;
+  border-radius: 0.35vw;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  color: #fde68a;
+  font-size: 0.68vw;
+  font-weight: 800;
+  letter-spacing: 0.04vw;
+  vertical-align: middle;
+}
+.anime-episode-badge i {
+  width: 0.35vw;
+  height: 0.35vw;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+.anime-episode-badge-mixed {
+  border-color: rgba(14, 165, 233, 0.55);
+  color: #bae6fd;
+}
+.anime-episode-badge-mixed i {
+  background: #0ea5e9;
+}
+/* Pinned top-left on the pause screen. */
+.anime-episode-badge-corner {
+  position: fixed;
+  top: var(--tv-safe-gutter, 48px);
+  left: var(--tv-safe-gutter, 48px);
+  margin-left: 0;
+  padding: 0.35vw 0.8vw;
+  font-size: 1vw;
+  gap: 0.45vw;
+}
+.anime-episode-badge-corner i {
+  width: 0.5vw;
+  height: 0.5vw;
+}

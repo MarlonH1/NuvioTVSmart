@@ -300,6 +300,13 @@ export const SECTION_META = [
   },
   { id: "ambient", labelKey: "ambient_mode_title", subtitleKey: "ambient_mode_subtitle" },
   {
+    id: "animeMode",
+    labelKey: "settings.sections.animeMode.label",
+    label: "Anime",
+    subtitleKey: "settings.sections.animeMode.subtitle",
+    subtitle: "Filler markers, hide filler episodes"
+  },
+  {
     id: "layout",
     labelKey: "settings.sections.layout.label",
     subtitleKey: "settings.sections.layout.subtitle"
@@ -355,6 +362,7 @@ export const SECTION_ICONS = {
   watchParty: "groups",
   nuvioRemote: "settings_remote",
   appearance: "palette",
+  animeMode: "local_florist",
   layout: "grid_view",
   contentDiscovery: "explore",
   plugins: "build",

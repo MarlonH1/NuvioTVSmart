@@ -1,4 +1,5 @@
 import { shouldBlurContinueWatchingThumbnail } from "../../../core/util/episodeThumbnailPrivacy.js";
+import { AnimeFiller } from "../../../core/anime/animeFiller.js";
 import { customPosterForItem, posterFallbackAttributes } from "../../../core/poster/customPoster.js";
 /* eslint-disable no-unused-vars */
 import { Router } from "../../navigation/routerState.js";
@@ -355,7 +356,7 @@ export function renderContinueWatchingCard(item, index, options = {}) {
         ${cardImage ? `<img class="home-continue-bg"${posterFallbackAttributes({ rawPosterUrl: originalCardImages[0] })} ${continueImageAttrs}${fallbackQueue ? ` data-fallback-srcs="${escapeAttribute(fallbackQueue)}"` : ""} alt="" aria-hidden="true" decoding="async" onerror="${buildImageFallbackErrorHandler()}" />` : ""}
         <span class="home-continue-badge">${escapeHtml(normalized.progressStatus || t("home.continueStatusContinue", {}, "Continue"))}</span>
         <div class="home-continue-copy">
-          ${normalized.episodeCode ? `<div class="home-continue-kicker">${escapeHtml(normalized.episodeCode)}</div>` : ""}
+          ${normalized.episodeCode ? `<div class="home-continue-kicker">${escapeHtml(normalized.episodeCode)}${AnimeFiller.episodeBadgeHtml({ metaId: normalized.contentId, season: normalized.season, episode: normalized.episode, videoId: normalized.videoId })}</div>` : ""}
           <div class="home-continue-title" dir="auto">${escapeHtml(normalized.title)}</div>
           ${subtitle ? `<div class="home-continue-subtitle">${escapeHtml(subtitle)}</div>` : ""}
         </div>

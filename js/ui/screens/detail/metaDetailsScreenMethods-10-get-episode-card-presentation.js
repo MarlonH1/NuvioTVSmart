@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
 import { PersonalRatingsStore, formatPersonalRating } from "../../../data/local/personalRatingsStore.js";
+import { AnimeFiller } from "../../../core/anime/animeFiller.js";
 
 export function createMetaDetailsScreenMethods10() {
   const {
@@ -71,7 +72,7 @@ export function createMetaDetailsScreenMethods10() {
               ${presentation.isWatched ? `<div class="series-episode-status complete">${renderWatchedBadgeGlyph()}</div>` : presentation.progressRatio < 0.02 ? `<div class="series-episode-status idle"></div>` : ""}
               ${presentation.isUnavailable ? `<div class="series-episode-unavailable">${escapeHtml(t("episodes_unavailable", {}, "Unavailable").toUpperCase())}</div>` : ""}
               <div class="series-episode-copy">
-                <div class="series-episode-badge">${escapeHtml(t("episodes_episode", {}, "Episode").toUpperCase())} ${Number(episode.episode || 0)}</div>
+                <div class="series-episode-badge">${escapeHtml(t("episodes_episode", {}, "Episode").toUpperCase())} ${Number(episode.episode || 0)}</div>${AnimeFiller.badgeHtml(episode.id)}
               <div class="series-episode-title" dir="${contentTextDirection(presentation.title)}"><span class="series-episode-title-text">${escapeHtml(presentation.title)}</span></div>
                 <div class="series-episode-overview" dir="${contentTextDirection(presentation.overview)}">${escapeHtml(presentation.overview)}</div>
                 ${presentation.metaParts ? `<div class="series-episode-meta">${presentation.metaParts}</div>` : ""}

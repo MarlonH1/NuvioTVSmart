@@ -1,4 +1,5 @@
 import { renderAmbientSection } from "./settingsAmbientSection.js";
+import { renderAnimeModeSection } from "./settingsAnimeModeSection.js";
 import { renderWatchPartySection } from "./settingsWatchPartySection.js";
 import { renderNuvioRemoteSection } from "./settingsNuvioRemoteSection.js";
 /* eslint-disable no-unused-vars */
@@ -189,6 +190,7 @@ export function createSettingsScreenMethods12() {
       if (section.id === "nuvioRemote") return renderNuvioRemoteSection.call(this);
       if (section.id === "appearance") return this.renderAppearanceSection(model);
       if (section.id === "ambient") return renderAmbientSection.call(this);
+      if (section.id === "animeMode") return renderAnimeModeSection.call(this);
       if (section.id === "layout") return this.renderLayoutSection(model);
       if (section.id === "contentDiscovery") return this.renderContentDiscoverySection();
       if (section.id === "plugins") return this.renderPluginsSection(model);

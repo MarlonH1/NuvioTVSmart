@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
+import { AnimeFiller } from "../../../core/anime/animeFiller.js";
 
 export function createMetaDetailsScreenMethods03() {
   const {
@@ -155,7 +156,7 @@ export function createMetaDetailsScreenMethods03() {
 
       // Fast first paint with base metadata.
       this.meta = meta;
-      this.episodes = normalizeEpisodes(meta?.videos || [], meta?.type || itemType);
+      this.episodes = AnimeFiller.filterEpisodes(normalizeEpisodes(meta?.videos || [], meta?.type || itemType));
       this.castItems = extractCast(meta);
       const progressItemsForDetail = this.resumeProgress ? [this.resumeProgress, ...allProgressItems] : allProgressItems;
       this.buildEpisodeState(progressItemsForDetail, allWatchedItems);
@@ -180,6 +181,23 @@ export function createMetaDetailsScreenMethods03() {
       this.maybePlayOnLoad(token);
       void this.refreshTrailerSource(meta, token);
       void this.loadTraktComments({ force: true });
+      // Anime Mode: filler / mixed-canon markers, added to the cards once the lookup finishes.
+      void AnimeFiller.resolve(meta).then((found) => {
+        if (!found || token !== this.detailLoadToken) return;
+        const visibleEpisodes = AnimeFiller.filterEpisodes(normalizeEpisodes(this.meta?.videos || [], this.meta?.type || itemType));
+        if (visibleEpisodes.length === this.episodes.length) {
+          AnimeFiller.decorate(this.container);
+          return;
+        }
+        // Hide filler: the list shrank, so keep season and up-next pointing at visible episodes.
+        this.episodes = visibleEpisodes;
+        if (!visibleEpisodes.some((episode) => episode.season === this.selectedSeason)) {
+          this.selectedSeason = visibleEpisodes[0]?.season ?? this.selectedSeason;
+        }
+        this.nextEpisodeToWatch = this.computeNextEpisodeToWatch(this.resumeProgress);
+        this.updateRenderedDetailSections(this.meta);
+        AnimeFiller.decorate(this.container);
+      });
 
       // Match Android TV: recommendations are an independent detail-page job.
       // Starting them from the base meta keeps slower artwork/credits enrichment
@@ -213,7 +231,7 @@ export function createMetaDetailsScreenMethods03() {
         }
         const currentProgressItemsForDetail = this.resumeProgress ? [this.resumeProgress, ...currentProgressItems] : currentProgressItems;
         this.meta = enrichedMeta || meta;
-        this.episodes = normalizeEpisodes(this.meta?.videos || [], this.meta?.type || this.params?.itemType);
+        this.episodes = AnimeFiller.filterEpisodes(normalizeEpisodes(this.meta?.videos || [], this.meta?.type || this.params?.itemType));
         this.castItems = extractCast(this.meta);
         this.buildEpisodeState(currentProgressItemsForDetail, currentWatchedItems, this.enrichedWatchedState);
         this.trailerSource = resolveTrailerSource(this.meta);

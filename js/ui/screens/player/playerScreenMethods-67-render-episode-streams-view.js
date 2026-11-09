@@ -1,3 +1,4 @@
+import { AnimeFiller } from "../../../core/anime/animeFiller.js";
 import { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
 import { episodeKey } from "../../../core/player/episodeShuffle.js";
 /* eslint-disable no-unused-vars */
@@ -189,6 +190,7 @@ export function createPlayerScreenMethods67() {
               </div>
               <div class="player-episode-copy">
                 <div class="player-episode-item-title" dir="${contentTextDirection(episode.title || t("episodes_episode", {}, "Episode"))}">${escapeHtml(episode.title || t("episodes_episode", {}, "Episode"))}</div>
+                ${AnimeFiller.episodeBadgeHtml({ metaId: this.params?.itemId, season: episode.season, episode: episode.episode, videoId: episode.id })}
                 ${date ? `<div class="player-episode-date">${escapeHtml(date)}</div>` : ""}
                 <div class="player-episode-item-subtitle" dir="${contentTextDirection(episode.overview || "")}">${escapeHtml(episode.overview || "")}</div>
               </div>

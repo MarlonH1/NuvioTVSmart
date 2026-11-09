@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { AnimeFiller } from "../../../core/anime/animeFiller.js";
 
 export function createPlayerScreenMethods15() {
   const { PlayerController, PlayerSettingsStore, renderLoadingIndicator, t, escapeHtml, escapeAttribute } = internals;
@@ -180,6 +181,7 @@ export function createPlayerScreenMethods15() {
                 <div class="player-meta">
                   <div class="player-title">${escapeHtml(header.title)}</div>
                   ${header.subtitle ? `<div class="player-subtitle">${escapeHtml(header.subtitle)}</div>` : ""}
+                  ${AnimeFiller.episodeBadgeHtml({ metaId: this.params?.itemId, season: this.params?.season, episode: this.params?.episode, videoId: this.params?.videoId })}
                   ${header.meta ? `<div class="player-meta-secondary">${escapeHtml(header.meta)}</div>` : ""}
                   <div id="playerStreamSource" class="player-meta-secondary player-stream-source hidden" aria-hidden="true"></div>
                 </div>

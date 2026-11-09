@@ -1,4 +1,5 @@
 import { shouldBlurPlayerEpisode } from "./episodePanelThumbnailPrivacy.js";
+import { AnimeFiller } from "../../../core/anime/animeFiller.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -164,15 +165,25 @@ export function createPlayerScreenMethods20() {
 
       const meta = this.pauseOverlayMeta || this.buildPauseOverlayMeta();
       const castItems = Array.isArray(meta.cast) ? meta.cast.slice(0, MAX_PAUSE_OVERLAY_CAST) : [];
+      // Anime filler / mixed-canon marker: pinned top-left and next to the episode code.
+      const fillerArgs = {
+        metaId: this.params?.itemId,
+        season: this.params?.season,
+        episode: this.params?.episode,
+        videoId: this.params?.videoId
+      };
+      const fillerCorner = AnimeFiller.episodeBadgeHtml(fillerArgs, "anime-episode-badge-corner");
+      const fillerInline = AnimeFiller.episodeBadgeHtml(fillerArgs);
       overlay.innerHTML = `
           <div class="player-pause-overlay-top">
+            ${fillerCorner}
             <div class="player-pause-overlay-clock">${escapeHtml(clockText)}</div>
           </div>
           <div class="player-pause-overlay-shade"></div>
           <div class="player-pause-overlay-content">
             <div class="player-pause-kicker">${escapeHtml(t("pause_you_are_watching", {}, "You're watching"))}</div>
             ${meta.logoUrl ? `<img class="player-pause-logo" src="${escapeAttribute(meta.logoUrl)}" alt="${escapeAttribute(meta.title)}" />` : `<div class="player-pause-title">${escapeHtml(meta.title)}</div>`}
-            ${meta.releaseYear || meta.episodeCode ? `<div class="player-pause-meta-line">${escapeHtml([meta.releaseYear, meta.episodeCode].filter(Boolean).join(" • "))}</div>` : ""}
+            ${meta.releaseYear || meta.episodeCode ? `<div class="player-pause-meta-line">${escapeHtml([meta.releaseYear, meta.episodeCode].filter(Boolean).join(" • "))}${fillerInline}</div>` : ""}
             ${meta.episodeTitle ? `<div class="player-pause-episode-title">${escapeHtml(meta.episodeTitle)}</div>` : ""}
             ${meta.description ? `<div class="player-pause-description">${escapeHtml(meta.description)}</div>` : ""}
             ${
